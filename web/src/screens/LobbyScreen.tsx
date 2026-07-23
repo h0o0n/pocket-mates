@@ -23,7 +23,7 @@ export function LobbyScreen({
   onStart,
   onLeave,
 }: Props) {
-  const canStart = participants.length >= 2;
+  const canStart = participants.length >= 1;
 
   async function copyCode() {
     try {
@@ -74,8 +74,8 @@ export function LobbyScreen({
         </div>
 
         <div className="tip">
-          💡 2명 이상 모이면 시작할 수 있어요. 최대 {MAX_MEMBERS}명. 각자 폰으로 답하고, 먼저 끝난 사람은 결과를
-          기다리면 됩니다.
+          💡 혼자 바로 시작해도 되고, 친구를 불러도 돼요. 최대 {MAX_MEMBERS}명. 각자 폰으로 답하고, 먼저 끝난
+          사람은 결과를 기다리면 됩니다.
         </div>
 
         {error ? <p className="form-error">{error}</p> : null}

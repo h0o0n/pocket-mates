@@ -167,7 +167,7 @@ export async function startAnswering(roomId: string): Promise<void> {
     .eq("room_id", roomId);
 
   if (countError) throw countError;
-  if ((count ?? 0) < 2) throw new Error("2명 이상 모여야 시작할 수 있어요.");
+  if ((count ?? 0) < 1) throw new Error("참가자가 있어야 시작할 수 있어요.");
 
   const { error } = await supabase
     .from("rooms")

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   isKakaoConfigured,
   loadKakaoMaps,
+  relayoutMap,
   searchRestaurantsFromMenus,
   type KakaoMap,
   type KakaoMarker,
@@ -67,6 +68,7 @@ export function NearbyRestaurants({ menuNames, lat, lng, locationName }: Props) 
         } else {
           mapInstance.current.setCenter(center);
         }
+        relayoutMap(mapInstance.current, center);
 
         // 이전 마커 제거
         for (const marker of markersRef.current) marker.setMap(null);

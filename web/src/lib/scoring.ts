@@ -1,5 +1,4 @@
 import { MENUS, type Menu } from "../data/menus";
-import { QUESTIONS } from "../data/questions";
 
 export type AnswerMap = Record<string, string[]>;
 
@@ -10,6 +9,9 @@ export type RankedMenu = Menu & {
   match: number;
   reason: string;
 };
+
+/** 한 사람 기준 최대 점수 (종류3 + 맛3 + 온도1 + 든든함2 + 예산2) */
+const PERSON_SCORE_MAX = 11;
 
 /** 멤버별 답변을 합산해 공통 만족도가 높은 메뉴 TOP 3를 계산합니다. */
 export function rankMenus(answerList: AnswerMap[], reroll = 0): RankedMenu[] {
@@ -50,10 +52,12 @@ export function rankMenus(answerList: AnswerMap[], reroll = 0): RankedMenu[] {
   let top = scored.slice(offset, offset + 3);
   if (top.length < 3) top = scored.slice(0, 3);
 
-  const max = QUESTIONS.length * 11 * Math.max(1, answerList.length);
+  // 실제 획득 점수 / (인원 × 11점) 으로 취향 일치율을 계산합니다.
+  // 예전에는 질문 수까지 곱해 분모가 커져 항상 74~78% 근처로 뭉개졌습니다.
+  const maxTotal = PERSON_SCORE_MAX * Math.max(1, answerList.length);
 
   return top.map((menu, index) => {
-    const match = Math.max(68, Math.min(98, Math.round(74 + (menu.total / max) * 28)));
+    const match = Math.max(0, Math.min(100, Math.round((menu.total / maxTotal) * 100)));
     const reason =
       index === 0
         ? "모두의 선택이 가장 고르게 겹쳤어요. 오늘의 1순위로 딱이에요!"

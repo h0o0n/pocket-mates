@@ -3,6 +3,7 @@ import {
   DEFAULT_MAP_CENTER,
   isKakaoConfigured,
   loadKakaoMaps,
+  relayoutMap,
   reverseGeocode,
   type KakaoMap,
   type KakaoMarker,
@@ -63,6 +64,8 @@ export function LocationPickerScreen({ nickname, busy, error, onBack, onConfirm 
 
         mapInstance.current = map;
         markerInstance.current = marker;
+        // display/레이아웃 직후 회색 빈 지도가 되는 경우를 막습니다.
+        relayoutMap(map, center);
 
         // 지도 클릭 시 마커·주소를 갱신합니다.
         kakao.maps.event.addListener(map, "click", (...args: unknown[]) => {
@@ -197,6 +200,7 @@ export function LocationPickerScreen({ nickname, busy, error, onBack, onConfirm 
         ) : null}
 
         <div className="map-canvas" ref={mapRef} aria-label="위치 선택 지도" />
+        {!ready && !loadError ? <p className="nearby-status">지도를 불러오는 중...</p> : null}
 
         <div className="map-selected">
           <small>선택한 위치</small>
@@ -204,6 +208,12 @@ export function LocationPickerScreen({ nickname, busy, error, onBack, onConfirm 
         </div>
 
         {loadError || error ? <p className="form-error">{loadError || error}</p> : null}
+        {ready && !loadError ? (
+          <p className="map-hint">
+            지도가 회색이거나 안 보이면: 카카오 콘솔 Web 도메인 등록과 (배포 시) Vercel의
+            VITE_KAKAO_MAP_APP_KEY 설정을 확인해 주세요.
+          </p>
+        ) : null}
 
         <button
           className="primary full"

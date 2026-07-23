@@ -45,6 +45,7 @@ type KakaoLatLng = {
 type KakaoMap = {
   setCenter: (latlng: KakaoLatLng) => void;
   getCenter: () => KakaoLatLng;
+  relayout: () => void;
 };
 
 type KakaoMarker = {
@@ -113,6 +114,9 @@ function getAppKey(): string {
   return key;
 }
 
+const KAKAO_SETUP_HINT =
+  "카카오 Developers → 내 애플리케이션 → 앱 설정에서 JavaScript 키를 확인하고, 플랫폼(Web)에 현재 사이트 도메인(예: http://localhost:5173 또는 Vercel 주소)을 등록해 주세요. Vercel이면 Environment Variable에 VITE_KAKAO_MAP_APP_KEY도 넣어야 합니다.";
+
 /** 카카오맵 JS SDK(+ services)를 한 번만 로드합니다. */
 export function loadKakaoMaps(): Promise<KakaoMapsNamespace> {
   if (typeof window === "undefined") {
@@ -120,32 +124,54 @@ export function loadKakaoMaps(): Promise<KakaoMapsNamespace> {
   }
 
   if (window.kakao?.maps) {
-    return new Promise((resolve) => {
-      window.kakao!.maps.load(() => resolve(window.kakao!));
+    return new Promise((resolve, reject) => {
+      try {
+        window.kakao!.maps.load(() => resolve(window.kakao!));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(KAKAO_SETUP_HINT));
+      }
     });
   }
 
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise((resolve, reject) => {
+    const appKey = getAppKey();
     const script = document.createElement("script");
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(getAppKey())}&libraries=services&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&libraries=services&autoload=false`;
     script.async = true;
     script.onload = () => {
       if (!window.kakao?.maps) {
-        reject(new Error("카카오맵 SDK를 불러오지 못했어요."));
+        loadPromise = null;
+        reject(new Error(`카카오맵 SDK를 불러오지 못했어요. ${KAKAO_SETUP_HINT}`));
         return;
       }
-      window.kakao.maps.load(() => resolve(window.kakao!));
+      try {
+        window.kakao.maps.load(() => resolve(window.kakao!));
+      } catch (err) {
+        loadPromise = null;
+        reject(err instanceof Error ? err : new Error(KAKAO_SETUP_HINT));
+      }
     };
     script.onerror = () => {
       loadPromise = null;
-      reject(new Error("카카오맵 스크립트 로드에 실패했어요. 앱키와 도메인 등록을 확인해 주세요."));
+      reject(new Error(`카카오맵 스크립트 로드에 실패했어요. ${KAKAO_SETUP_HINT}`));
     };
     document.head.appendChild(script);
   });
 
   return loadPromise;
+}
+
+/** 컨테이너 크기가 잡힌 뒤 타일이 깨지지 않도록 레이아웃을 다시 잡습니다. */
+export function relayoutMap(map: KakaoMap, center?: KakaoLatLng): void {
+  const apply = () => {
+    map.relayout();
+    if (center) map.setCenter(center);
+  };
+  requestAnimationFrame(apply);
+  window.setTimeout(apply, 120);
+  window.setTimeout(apply, 400);
 }
 
 export function isKakaoConfigured(): boolean {
