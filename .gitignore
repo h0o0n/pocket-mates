@@ -1,2 +1,9 @@
 .vercel
 dist
+web/dist
+web/node_modules
+node_modules
+.env
+web/.env
+.DS_Store
+*.log
