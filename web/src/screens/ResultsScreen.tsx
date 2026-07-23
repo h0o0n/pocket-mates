@@ -1,15 +1,34 @@
 import { useMemo, useState } from "react";
+import { NearbyRestaurants } from "../components/NearbyRestaurants";
 import { rankMenus, type AnswerMap } from "../lib/scoring";
 
 type Props = {
   nicknames: string[];
   answerList: AnswerMap[];
+  roomLat: number | null;
+  roomLng: number | null;
+  locationName: string | null;
   onRestart: () => void;
 };
 
-export function ResultsScreen({ nicknames, answerList, onRestart }: Props) {
+export function ResultsScreen({
+  nicknames,
+  answerList,
+  roomLat,
+  roomLng,
+  locationName,
+  onRestart,
+}: Props) {
   const [reroll, setReroll] = useState(0);
   const topMenus = useMemo(() => rankMenus(answerList, reroll), [answerList, reroll]);
+
+  // 음식점 검색용 키워드 — TOP 3 메뉴 이름을 그대로 사용합니다.
+  const menuKeywords = useMemo(() => topMenus.map((menu) => menu.name), [topMenus]);
+  const hasLocation =
+    typeof roomLat === "number" &&
+    typeof roomLng === "number" &&
+    Number.isFinite(roomLat) &&
+    Number.isFinite(roomLng);
 
   return (
     <section className="screen active" id="results">
@@ -42,6 +61,19 @@ export function ResultsScreen({ nicknames, answerList, onRestart }: Props) {
         ))}
       </div>
 
+      {hasLocation ? (
+        <NearbyRestaurants
+          menuNames={menuKeywords}
+          lat={roomLat}
+          lng={roomLng}
+          locationName={locationName}
+        />
+      ) : (
+        <p className="nearby-status">
+          이 방에는 위치가 없어 주변 음식점을 보여주지 못해요. 새 방을 만들 때 지도에서 위치를 골라 주세요.
+        </p>
+      )}
+
       <div className="result-actions">
         <button className="secondary" type="button" onClick={() => setReroll((value) => value + 1)}>
           ↻ 다른 후보 보기
@@ -55,7 +87,8 @@ export function ResultsScreen({ nicknames, answerList, onRestart }: Props) {
         <summary>어떻게 골랐나요?</summary>
         <p>
           모든 멤버의 음식 종류, 맛, 온도, 든든함, 예산 선호를 합산하고 못 먹는 음식은 제외했어요. 한 사람만
-          아주 좋아하는 메뉴보다 모두가 고르게 만족하는 메뉴를 우선했어요.
+          아주 좋아하는 메뉴보다 모두가 고르게 만족하는 메뉴를 우선했어요. 주변 음식점은 방장이 고른 위치에서
+          TOP 3 메뉴 키워드를 섞어 검색한 결과예요.
         </p>
       </details>
     </section>

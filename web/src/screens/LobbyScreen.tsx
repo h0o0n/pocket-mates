@@ -4,6 +4,7 @@ import type { Participant } from "../lib/types";
 
 type Props = {
   roomCode: string;
+  locationName?: string | null;
   participants: Participant[];
   meId: string;
   busy: boolean;
@@ -14,6 +15,7 @@ type Props = {
 
 export function LobbyScreen({
   roomCode,
+  locationName,
   participants,
   meId,
   busy,
@@ -48,6 +50,13 @@ export function LobbyScreen({
             복사
           </button>
         </div>
+
+        {locationName ? (
+          <div className="location-chip">
+            <small>만날 위치</small>
+            <strong>{locationName}</strong>
+          </div>
+        ) : null}
 
         <div className="member-list">
           {participants.map((person, index) => (

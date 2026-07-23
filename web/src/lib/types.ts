@@ -2,10 +2,19 @@ import type { AnswerMap } from "./scoring";
 
 export type RoomStatus = "waiting" | "answering" | "completed";
 
+export type RoomLocation = {
+  lat: number;
+  lng: number;
+  locationName: string;
+};
+
 export type Room = {
   id: string;
   code: string;
   status: RoomStatus;
+  lat: number | null;
+  lng: number | null;
+  location_name: string | null;
   created_at: string;
 };
 

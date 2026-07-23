@@ -16,12 +16,14 @@ import { isSupabaseConfigured } from "./lib/supabase";
 import { EntryScreen } from "./screens/EntryScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { LobbyScreen } from "./screens/LobbyScreen";
+import { LocationPickerScreen } from "./screens/LocationPickerScreen";
 import { QuestionsScreen } from "./screens/QuestionsScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import { SetupMissing } from "./screens/SetupMissing";
 import { WaitingScreen } from "./screens/WaitingScreen";
+import type { RoomLocation } from "./lib/types";
 
-type View = "home" | "create" | "join" | "room";
+type View = "home" | "create" | "join" | "pick-location" | "room";
 
 const todayLabel = new Intl.DateTimeFormat("ko-KR", {
   month: "long",
@@ -33,6 +35,7 @@ export default function App() {
   const saved = loadSession();
   const [view, setView] = useState<View>(saved ? "room" : "home");
   const [session, setSession] = useState<LocalSession | null>(saved);
+  const [pendingNickname, setPendingNickname] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,16 +64,26 @@ export default function App() {
   function resetToHome() {
     clearSession();
     setSession(null);
+    setPendingNickname("");
     setError(null);
     setView("home");
   }
 
-  async function handleCreate(values: { nickname: string }) {
+  /** 닉네임만 받은 뒤, 지도에서 위치를 고르는 단계로 넘어갑니다. */
+  async function handleCreateNickname(values: { nickname: string }) {
+    setError(null);
+    setPendingNickname(values.nickname.trim());
+    setView("pick-location");
+  }
+
+  /** 선택한 위치와 닉네임으로 방을 생성합니다. */
+  async function handleCreateWithLocation(location: RoomLocation) {
     setBusy(true);
     setError(null);
     try {
-      const next = await createRoom(values.nickname);
+      const next = await createRoom(pendingNickname, location);
       setSession(next);
+      setPendingNickname("");
       setView("room");
     } catch (err) {
       setError(err instanceof Error ? err.message : "방을 만들지 못했어요.");
@@ -153,7 +166,20 @@ export default function App() {
         busy={busy}
         error={error}
         onBack={() => setView("home")}
-        onSubmit={handleCreate}
+        onSubmit={handleCreateNickname}
+      />
+    );
+  } else if (view === "pick-location") {
+    content = (
+      <LocationPickerScreen
+        nickname={pendingNickname}
+        busy={busy}
+        error={error}
+        onBack={() => {
+          setError(null);
+          setView("create");
+        }}
+        onConfirm={handleCreateWithLocation}
       />
     );
   } else if (view === "join") {
@@ -192,6 +218,7 @@ export default function App() {
       content = (
         <LobbyScreen
           roomCode={session.roomCode}
+          locationName={room.location_name}
           participants={participants}
           meId={session.participantId}
           busy={busy}
@@ -217,6 +244,9 @@ export default function App() {
         <ResultsScreen
           nicknames={participants.map((person) => person.nickname)}
           answerList={answerList}
+          roomLat={room?.lat ?? null}
+          roomLng={room?.lng ?? null}
+          locationName={room?.location_name ?? null}
           onRestart={resetToHome}
         />
       );

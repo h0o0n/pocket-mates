@@ -28,11 +28,12 @@ export function rankMenus(answerList: AnswerMap[], reroll = 0): RankedMenu[] {
       const desired = answers.price?.[0];
       if (desired) s += Math.max(0, 2 - Math.abs(priceIndex[desired] - priceIndex[menu.price]));
 
+      // 회피 옵션은 메뉴 이름 하드코딩 대신 tags/taste로 판별합니다.
       const avoid = answers.avoid || [];
       if (
         (avoid.includes("spicy") && menu.taste.includes("spicy")) ||
-        (avoid.includes("meat") && ["삼겹살", "돈카츠"].includes(menu.name)) ||
-        (avoid.includes("seafood") && menu.name === "초밥") ||
+        (avoid.includes("meat") && menu.tags.includes("고기")) ||
+        (avoid.includes("seafood") && menu.tags.includes("해산물")) ||
         (avoid.includes("noodle") && menu.tags.includes("면"))
       ) {
         s -= 20;

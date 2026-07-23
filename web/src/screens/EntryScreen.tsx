@@ -32,7 +32,7 @@ export function EntryScreen({ mode, busy, error, onBack, onSubmit }: Props) {
         <h2>{mode === "create" ? "먼저 닉네임을 정해요" : "입장 코드를 입력해요"}</h2>
         <p className="sub">
           {mode === "create"
-            ? "방을 만들면 6자리 코드가 생겨요. 친구들에게 공유해 주세요."
+            ? "닉네임을 정한 뒤, 지도에서 만날 위치를 고르면 6자리 코드가 생겨요."
             : "같은 코드를 입력한 사람들끼리 한 방으로 모입니다."}
         </p>
         <form className="entry-form" onSubmit={handleSubmit}>

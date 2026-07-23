@@ -8,8 +8,17 @@ create table if not exists public.rooms (
   code text not null unique,
   status text not null default 'waiting'
     check (status in ('waiting', 'answering', 'completed')),
+  -- 방장이 지도에서 고른 기준 위치 (음식점 검색에 사용)
+  lat double precision,
+  lng double precision,
+  location_name text,
   created_at timestamptz not null default now()
 );
+
+-- 이미 rooms 테이블이 있는 프로젝트용 마이그레이션
+alter table public.rooms add column if not exists lat double precision;
+alter table public.rooms add column if not exists lng double precision;
+alter table public.rooms add column if not exists location_name text;
 
 create table if not exists public.participants (
   id uuid primary key default gen_random_uuid(),
@@ -34,6 +43,12 @@ create table if not exists public.answers (
 create index if not exists rooms_code_idx on public.rooms (code);
 create index if not exists participants_room_id_idx on public.participants (room_id);
 create index if not exists answers_room_id_idx on public.answers (room_id);
+
+-- 테이블 권한: RLS 정책과 별도로 GRANT가 필요합니다.
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert, update on public.rooms to anon, authenticated, service_role;
+grant select, insert, update on public.participants to anon, authenticated, service_role;
+grant select, insert, update on public.answers to anon, authenticated, service_role;
 
 alter table public.rooms enable row level security;
 alter table public.participants enable row level security;

@@ -16,9 +16,9 @@ export function HomeScreen({ onCreate, onJoin, canResume, onResume }: Props) {
           <em>결론은 함께.</em>
         </h1>
         <p>
-          방을 만들고 코드를 공유하세요.
+          위치를 고르고 방을 만든 뒤 코드를 공유하세요.
           <br />
-          각자 속도로 답하고, 모두 끝나면 메뉴 TOP 3가 나와요.
+          모두 끝나면 메뉴 TOP 3와 주변 음식점 5곳이 나와요.
         </p>
         <div className="home-actions">
           <button className="primary" type="button" onClick={onCreate}>

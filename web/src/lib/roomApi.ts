@@ -1,7 +1,7 @@
 import { getClientKey, saveSession, type LocalSession } from "./session";
 import { getSupabase } from "./supabase";
 import type { AnswerMap } from "./scoring";
-import type { AnswerRow, Participant, Room } from "./types";
+import type { AnswerRow, Participant, Room, RoomLocation } from "./types";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_MEMBERS = 8;
@@ -80,15 +80,25 @@ async function insertParticipant(room: Room, nickname: string): Promise<LocalSes
   return session;
 }
 
-export async function createRoom(nickname: string): Promise<LocalSession> {
+export async function createRoom(nickname: string, location: RoomLocation): Promise<LocalSession> {
   const supabase = requireClient();
+
+  if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng)) {
+    throw new Error("지도에서 위치를 선택해 주세요.");
+  }
 
   // 코드 충돌 시 몇 번 재시도합니다.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = createRoomCode();
     const { data: room, error } = await supabase
       .from("rooms")
-      .insert({ code, status: "waiting" })
+      .insert({
+        code,
+        status: "waiting",
+        lat: location.lat,
+        lng: location.lng,
+        location_name: location.locationName.trim() || "선택한 위치",
+      })
       .select("*")
       .single();
 
