@@ -1,0 +1,12 @@
+{
+  "name": "select-food",
+  "version": "1.0.0",
+  "private": true,
+  "description": "여러 사람의 취향을 반영해 점심 메뉴를 추천하는 정적 웹앱",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
