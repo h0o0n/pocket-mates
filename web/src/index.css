@@ -55,5 +55,28 @@
 .nearby-list em{display:inline-block;font-style:normal;color:var(--orange-dark);background:#fff;border-radius:999px;padding:2px 8px;font-size:12px;margin:2px 0 6px}
 .nearby-list span{display:block;color:var(--muted);font-size:13px;line-height:1.4}
 .nearby-list small{display:block;margin-top:4px;color:#567037;font-size:12px}
-.nearby-list a{align-self:center;white-space:nowrap;color:var(--orange-dark);font-size:13px;font-weight:bold;padding:8px}
-@media(max-width:760px){.map-canvas,.nearby-map{height:240px}.nearby-section{padding:20px;border-radius:22px}.nearby-head h3{font-size:26px}.map-search{flex-direction:column}}
+.nearby-list a{white-space:nowrap;color:var(--orange-dark);font-size:12px;font-weight:bold}
+.nearby-list li{flex-wrap:wrap}
+.nearby-list .place-main{flex:1;min-width:200px;border:0;background:none;text-align:left;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:4px;color:inherit;font:inherit}
+.nearby-list .place-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
+.vote-btn{border:0;border-radius:12px;padding:8px 12px;background:var(--ink);color:#fff;font:13px "Jua",sans-serif;cursor:pointer}
+.vote-btn.selected{background:var(--orange)}
+.vote-btn:disabled{opacity:.6;cursor:not-allowed}
+.vote-count{color:var(--orange-dark)!important;font-weight:bold}
+.vote-progress{margin:0 0 12px;color:var(--muted);font-size:14px}
+.winner-banner{margin:0 0 18px;padding:18px;border-radius:18px;background:linear-gradient(135deg,#fff1e9,#ffe8bc);border:2px solid var(--orange);display:grid;gap:6px;text-align:center}
+.winner-banner small{color:var(--orange-dark);font-weight:bold}
+.winner-banner strong{font:28px "Jua",sans-serif}
+.winner-banner span{color:var(--muted);font-size:14px}
+.place-links{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:8px}
+.place-links a{color:var(--orange-dark);font-weight:bold;font-size:13px}
+.filter-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0 8px}
+.filter-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filter-group>span{color:var(--muted);font-size:13px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font:13px "Jua",sans-serif;cursor:pointer}
+.chip.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+.chip:disabled{opacity:.5;cursor:not-allowed}
+.nearby-list li.voted{outline:2px solid var(--green)}
+.share-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.share-note{margin:0 0 14px;color:#567037;background:#edf3e5;border-radius:12px;padding:10px 12px;font-size:13px}
+@media(max-width:760px){.map-canvas,.nearby-map{height:240px}.nearby-section{padding:20px;border-radius:22px}.nearby-head h3{font-size:26px}.map-search{flex-direction:column}.nearby-list .place-actions{width:100%;margin-left:42px}.filter-bar{flex-direction:column;align-items:stretch}}

@@ -6,13 +6,15 @@ type Props = {
   mode: Mode;
   busy: boolean;
   error: string | null;
+  /** 공유 링크로 들어왔을 때 미리 채워 둘 입장 코드 */
+  initialCode?: string;
   onBack: () => void;
   onSubmit: (values: { nickname: string; code?: string }) => Promise<void>;
 };
 
-export function EntryScreen({ mode, busy, error, onBack, onSubmit }: Props) {
+export function EntryScreen({ mode, busy, error, initialCode = "", onBack, onSubmit }: Props) {
   const [nickname, setNickname] = useState("");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -33,7 +35,9 @@ export function EntryScreen({ mode, busy, error, onBack, onSubmit }: Props) {
         <p className="sub">
           {mode === "create"
             ? "닉네임을 정한 뒤, 지도에서 만날 위치를 고르면 6자리 코드가 생겨요."
-            : "같은 코드를 입력한 사람들끼리 한 방으로 모입니다."}
+            : initialCode
+              ? "공유 링크로 입장했어요. 닉네임만 입력하면 됩니다."
+              : "같은 코드를 입력한 사람들끼리 한 방으로 모입니다."}
         </p>
         <form className="entry-form" onSubmit={handleSubmit}>
           {mode === "join" ? (
@@ -62,7 +66,7 @@ export function EntryScreen({ mode, busy, error, onBack, onSubmit }: Props) {
           </label>
           {error ? <p className="form-error">{error}</p> : null}
           <button className="primary full" type="submit" disabled={busy}>
-            {busy ? "연결 중..." : mode === "create" ? "방 만들고 입장" : "입장하기"}
+            {busy ? "연결 중..." : mode === "create" ? "다음: 위치 선택" : "입장하기"}
             {!busy ? <span>→</span> : null}
           </button>
         </form>

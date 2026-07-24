@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { AVATAR_COLORS } from "../data/questions";
 import { MAX_MEMBERS } from "../lib/roomApi";
+import { buildInviteText, buildInviteUrl } from "../lib/share";
 import type { Participant } from "../lib/types";
 
 type Props = {
@@ -24,12 +26,43 @@ export function LobbyScreen({
   onLeave,
 }: Props) {
   const canStart = participants.length >= 1;
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(roomCode);
+      setShareNote("입장 코드를 복사했어요.");
     } catch {
-      // 클립보드 실패는 무시하고 화면에 코드만 보여줍니다.
+      setShareNote("복사에 실패했어요. 코드를 직접 알려 주세요.");
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(buildInviteUrl(roomCode));
+      setShareNote("초대 링크를 복사했어요.");
+    } catch {
+      setShareNote("링크 복사에 실패했어요.");
+    }
+  }
+
+  async function copyKakaoText() {
+    const text = buildInviteText(roomCode, locationName);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "오늘 뭐 먹지?", text });
+        setShareNote("공유 시트를 열었어요.");
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      setShareNote("카카오톡에 붙여넣을 문구를 복사했어요.");
+    } catch {
+      try {
+        await navigator.clipboard.writeText(text);
+        setShareNote("카카오톡에 붙여넣을 문구를 복사했어요.");
+      } catch {
+        setShareNote("공유 문구 복사에 실패했어요.");
+      }
     }
   }
 
@@ -41,15 +74,25 @@ export function LobbyScreen({
         </button>
         <span className="step">대기실</span>
         <h2>친구들을 불러오세요</h2>
-        <p className="sub">같은 입장 코드로 들어오면 바로 이 방에 합류해요.</p>
+        <p className="sub">코드나 링크로 들어오면 바로 이 방에 합류해요.</p>
 
         <div className="code-box">
           <small>입장 코드</small>
           <strong>{roomCode}</strong>
-          <button className="secondary" type="button" onClick={copyCode}>
-            복사
+          <button className="secondary" type="button" onClick={() => void copyCode()}>
+            코드 복사
           </button>
         </div>
+
+        <div className="share-actions">
+          <button className="secondary" type="button" onClick={() => void copyLink()}>
+            링크 복사
+          </button>
+          <button className="secondary" type="button" onClick={() => void copyKakaoText()}>
+            카톡 문구 공유
+          </button>
+        </div>
+        {shareNote ? <p className="share-note">{shareNote}</p> : null}
 
         {locationName ? (
           <div className="location-chip">

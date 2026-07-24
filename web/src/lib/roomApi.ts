@@ -1,7 +1,8 @@
 import { getClientKey, saveSession, type LocalSession } from "./session";
 import { getSupabase } from "./supabase";
+import type { KakaoPlace } from "./kakaoMaps";
 import type { AnswerMap } from "./scoring";
-import type { AnswerRow, Participant, Room, RoomLocation } from "./types";
+import type { AnswerRow, Participant, PlaceVote, Room, RoomLocation } from "./types";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_MEMBERS = 8;
@@ -216,6 +217,94 @@ export async function markRoomCompletedIfReady(roomId: string, participants: Par
     .eq("id", roomId)
     .in("status", ["answering", "waiting"]);
 
+  if (error) throw error;
+}
+
+export async function fetchPlaceVotes(roomId: string): Promise<PlaceVote[]> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.from("place_votes").select("*").eq("room_id", roomId);
+  if (error) throw error;
+  return (data ?? []) as PlaceVote[];
+}
+
+/** 아직 후보가 없을 때만 음식점 목록을 방에 저장합니다(동시 저장 시 한쪽만 반영). */
+export async function savePlaceCandidatesIfEmpty(
+  roomId: string,
+  places: KakaoPlace[],
+): Promise<KakaoPlace[]> {
+  const supabase = requireClient();
+
+  const { data: current, error: readError } = await supabase
+    .from("rooms")
+    .select("place_candidates")
+    .eq("id", roomId)
+    .single();
+  if (readError) throw readError;
+
+  const existing = current?.place_candidates as KakaoPlace[] | null;
+  if (Array.isArray(existing) && existing.length > 0) return existing;
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .update({ place_candidates: places })
+    .eq("id", roomId)
+    .is("place_candidates", null)
+    .select("place_candidates")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (Array.isArray(data?.place_candidates) && data.place_candidates.length > 0) {
+    return data.place_candidates as KakaoPlace[];
+  }
+
+  // 다른 클라이언트가 먼저 저장한 경우 다시 읽습니다.
+  const { data: again, error: againError } = await supabase
+    .from("rooms")
+    .select("place_candidates")
+    .eq("id", roomId)
+    .single();
+  if (againError) throw againError;
+  return (again?.place_candidates as KakaoPlace[]) ?? places;
+}
+
+/** 투표가 없을 때만 후보를 다시 검색해 덮어씁니다. */
+export async function replacePlaceCandidates(roomId: string, places: KakaoPlace[]): Promise<void> {
+  const supabase = requireClient();
+  const { count, error: countError } = await supabase
+    .from("place_votes")
+    .select("*", { count: "exact", head: true })
+    .eq("room_id", roomId);
+  if (countError) throw countError;
+  if ((count ?? 0) > 0) {
+    throw new Error("이미 투표가 시작돼서 후보를 바꿀 수 없어요.");
+  }
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({ place_candidates: places })
+    .eq("id", roomId);
+  if (error) throw error;
+}
+
+export async function upsertPlaceVote(input: {
+  roomId: string;
+  participantId: string;
+  place: KakaoPlace;
+}): Promise<void> {
+  const supabase = requireClient();
+  const { error } = await supabase.from("place_votes").upsert(
+    {
+      room_id: input.roomId,
+      participant_id: input.participantId,
+      place_id: input.place.id,
+      place_name: input.place.name,
+      place_address: input.place.roadAddress || input.place.address || null,
+      place_lat: input.place.lat,
+      place_lng: input.place.lng,
+      place_url: input.place.url || null,
+    },
+    { onConflict: "participant_id" },
+  );
   if (error) throw error;
 }
 

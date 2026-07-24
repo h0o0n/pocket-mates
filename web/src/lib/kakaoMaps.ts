@@ -211,16 +211,23 @@ function toPlace(row: KakaoPlaceResult, menuKeyword: string): KakaoPlace {
   };
 }
 
+export type PlaceSearchOptions = {
+  /** 검색 반경(m). 기본 1000 */
+  radius?: number;
+};
+
 /** 단일 메뉴 키워드로 주변 음식점을 검색합니다. */
 async function searchPlacesByKeyword(
   keyword: string,
   lat: number,
   lng: number,
   size = 5,
+  options: PlaceSearchOptions = {},
 ): Promise<KakaoPlace[]> {
   const kakao = await loadKakaoMaps();
   const places = new kakao.maps.services.Places();
   const location = new kakao.maps.LatLng(lat, lng);
+  const radius = options.radius ?? 1000;
 
   return new Promise((resolve) => {
     places.keywordSearch(
@@ -234,7 +241,7 @@ async function searchPlacesByKeyword(
       },
       {
         location,
-        radius: 3000,
+        radius,
         size,
         // FD6: 음식점 카테고리 그룹
         category_group_code: "FD6",
@@ -252,12 +259,14 @@ export async function searchRestaurantsFromMenus(
   lat: number,
   lng: number,
   limit = 5,
+  options: PlaceSearchOptions = {},
 ): Promise<KakaoPlace[]> {
   const keywords = menuNames.map((name) => name.trim()).filter(Boolean);
   if (!keywords.length) return [];
 
+  const radius = options.radius ?? 1000;
   const perKeyword = await Promise.all(
-    keywords.map((keyword) => searchPlacesByKeyword(keyword, lat, lng, limit)),
+    keywords.map((keyword) => searchPlacesByKeyword(keyword, lat, lng, limit, options)),
   );
 
   const picked: KakaoPlace[] = [];
@@ -297,12 +306,14 @@ export async function searchRestaurantsFromMenus(
             }
             resolve(data.map((row) => toPlace(row, keyword)));
           },
-          { location, radius: 5000, size: 10 },
+          { location, radius: Math.max(radius, 2000), size: 10 },
         );
       });
 
       for (const place of extras) {
         if (seen.has(place.id)) continue;
+        // 반경 밖 결과는 거리 정보가 있으면 걸러냅니다.
+        if (place.distance && Number(place.distance) > radius) continue;
         seen.add(place.id);
         picked.push(place);
         if (picked.length >= limit) break;

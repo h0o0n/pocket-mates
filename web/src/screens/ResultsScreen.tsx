@@ -1,28 +1,38 @@
 import { useMemo, useState } from "react";
 import { NearbyRestaurants } from "../components/NearbyRestaurants";
+import type { KakaoPlace } from "../lib/kakaoMaps";
 import { rankMenus, type AnswerMap } from "../lib/scoring";
+import type { PlaceVote } from "../lib/types";
 
 type Props = {
+  roomId: string;
+  participantId: string;
   nicknames: string[];
   answerList: AnswerMap[];
   roomLat: number | null;
   roomLng: number | null;
   locationName: string | null;
+  placeCandidates: KakaoPlace[] | null;
+  placeVotes: PlaceVote[];
+  participantCount: number;
   onRestart: () => void;
 };
 
 export function ResultsScreen({
+  roomId,
+  participantId,
   nicknames,
   answerList,
   roomLat,
   roomLng,
   locationName,
+  placeCandidates,
+  placeVotes,
+  participantCount,
   onRestart,
 }: Props) {
   const [reroll, setReroll] = useState(0);
   const topMenus = useMemo(() => rankMenus(answerList, reroll), [answerList, reroll]);
-
-  // 음식점 검색용 키워드 — TOP 3 메뉴 이름을 그대로 사용합니다.
   const menuKeywords = useMemo(() => topMenus.map((menu) => menu.name), [topMenus]);
   const hasLocation =
     typeof roomLat === "number" &&
@@ -63,10 +73,15 @@ export function ResultsScreen({
 
       {hasLocation ? (
         <NearbyRestaurants
+          roomId={roomId}
+          participantId={participantId}
           menuNames={menuKeywords}
           lat={roomLat}
           lng={roomLng}
           locationName={locationName}
+          savedCandidates={placeCandidates}
+          placeVotes={placeVotes}
+          participantCount={participantCount}
         />
       ) : (
         <p className="nearby-status">
@@ -76,7 +91,7 @@ export function ResultsScreen({
 
       <div className="result-actions">
         <button className="secondary" type="button" onClick={() => setReroll((value) => value + 1)}>
-          ↻ 다른 후보 보기
+          ↻ 다른 메뉴 후보 보기
         </button>
         <button className="primary" type="button" onClick={onRestart}>
           처음부터 다시
@@ -86,9 +101,8 @@ export function ResultsScreen({
       <details className="logic">
         <summary>어떻게 골랐나요?</summary>
         <p>
-          모든 멤버의 음식 종류, 맛, 온도, 든든함, 예산 선호를 합산하고 못 먹는 음식은 제외했어요. 한 사람만
-          아주 좋아하는 메뉴보다 모두가 고르게 만족하는 메뉴를 우선했어요. 주변 음식점은 방장이 고른 위치에서
-          TOP 3 메뉴 키워드를 섞어 검색한 결과예요.
+          모든 멤버의 음식 종류, 맛, 온도, 든든함, 예산 선호를 합산하고 못 먹는 음식은 제외했어요. 주변 음식점은
+          방장이 고른 위치에서 TOP 3 메뉴 키워드를 섞어 검색한 뒤, 투표로 오늘 갈 곳을 정해요.
         </p>
       </details>
     </section>

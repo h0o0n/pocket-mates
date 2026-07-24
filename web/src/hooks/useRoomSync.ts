@@ -2,25 +2,28 @@ import { useEffect, useState } from "react";
 import {
   fetchAnswers,
   fetchParticipants,
+  fetchPlaceVotes,
   fetchRoom,
   markRoomCompletedIfReady,
 } from "../lib/roomApi";
 import { getSupabase } from "../lib/supabase";
-import type { AnswerRow, Participant, Room } from "../lib/types";
+import type { AnswerRow, Participant, PlaceVote, Room } from "../lib/types";
 
 type RoomSyncState = {
   room: Room | null;
   participants: Participant[];
   answers: AnswerRow[];
+  placeVotes: PlaceVote[];
   loading: boolean;
   error: string | null;
 };
 
-/** 방/참가자/답변을 불러오고 Realtime으로 동기화합니다. */
+/** 방/참가자/답변/투표를 불러오고 Realtime으로 동기화합니다. */
 export function useRoomSync(roomId: string | null): RoomSyncState {
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [answers, setAnswers] = useState<AnswerRow[]>([]);
+  const [placeVotes, setPlaceVotes] = useState<PlaceVote[]>([]);
   const [loading, setLoading] = useState(Boolean(roomId));
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export function useRoomSync(roomId: string | null): RoomSyncState {
       setRoom(null);
       setParticipants([]);
       setAnswers([]);
+      setPlaceVotes([]);
       setLoading(false);
       return;
     }
@@ -45,15 +49,17 @@ export function useRoomSync(roomId: string | null): RoomSyncState {
 
     async function refresh() {
       try {
-        const [nextRoom, nextParticipants, nextAnswers] = await Promise.all([
+        const [nextRoom, nextParticipants, nextAnswers, nextVotes] = await Promise.all([
           fetchRoom(activeRoomId),
           fetchParticipants(activeRoomId),
           fetchAnswers(activeRoomId),
+          fetchPlaceVotes(activeRoomId),
         ]);
         if (cancelled) return;
         setRoom(nextRoom);
         setParticipants(nextParticipants);
         setAnswers(nextAnswers);
+        setPlaceVotes(nextVotes);
         setError(null);
         await markRoomCompletedIfReady(activeRoomId, nextParticipants);
       } catch (err) {
@@ -91,6 +97,13 @@ export function useRoomSync(roomId: string | null): RoomSyncState {
           void refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "place_votes", filter: `room_id=eq.${activeRoomId}` },
+        () => {
+          void refresh();
+        },
+      )
       .subscribe();
 
     return () => {
@@ -99,5 +112,5 @@ export function useRoomSync(roomId: string | null): RoomSyncState {
     };
   }, [roomId]);
 
-  return { room, participants, answers, loading, error };
+  return { room, participants, answers, placeVotes, loading, error };
 }

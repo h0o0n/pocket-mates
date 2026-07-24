@@ -1,4 +1,5 @@
 import type { AnswerMap } from "./scoring";
+import type { KakaoPlace } from "./kakaoMaps";
 
 export type RoomStatus = "waiting" | "answering" | "completed";
 
@@ -15,6 +16,7 @@ export type Room = {
   lat: number | null;
   lng: number | null;
   location_name: string | null;
+  place_candidates: KakaoPlace[] | null;
   created_at: string;
 };
 
@@ -33,4 +35,17 @@ export type AnswerRow = {
   participant_id: string;
   payload: AnswerMap;
   updated_at: string;
+};
+
+export type PlaceVote = {
+  id: string;
+  room_id: string;
+  participant_id: string;
+  place_id: string;
+  place_name: string;
+  place_address: string | null;
+  place_lat: number | null;
+  place_lng: number | null;
+  place_url: string | null;
+  created_at: string;
 };

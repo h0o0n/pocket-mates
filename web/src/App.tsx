@@ -12,7 +12,10 @@ import {
   submitAnswers,
 } from "./lib/roomApi";
 import type { AnswerMap } from "./lib/scoring";
+import { readInviteCodeFromUrl } from "./lib/share";
 import { isSupabaseConfigured } from "./lib/supabase";
+import type { KakaoPlace } from "./lib/kakaoMaps";
+import type { RoomLocation } from "./lib/types";
 import { EntryScreen } from "./screens/EntryScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { LobbyScreen } from "./screens/LobbyScreen";
@@ -21,7 +24,6 @@ import { QuestionsScreen } from "./screens/QuestionsScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import { SetupMissing } from "./screens/SetupMissing";
 import { WaitingScreen } from "./screens/WaitingScreen";
-import type { RoomLocation } from "./lib/types";
 
 type View = "home" | "create" | "join" | "pick-location" | "room";
 
@@ -31,15 +33,31 @@ const todayLabel = new Intl.DateTimeFormat("ko-KR", {
   weekday: "long",
 }).format(new Date());
 
+/** 공유 링크로 들어온 경우 입장 화면으로 보냅니다. */
+function getInitialView(saved: LocalSession | null): { view: View; inviteCode: string } {
+  const inviteCode = readInviteCodeFromUrl(true) ?? "";
+  if (inviteCode && !saved) {
+    return { view: "join", inviteCode };
+  }
+  return { view: saved ? "room" : "home", inviteCode };
+}
+
 export default function App() {
-  const saved = loadSession();
-  const [view, setView] = useState<View>(saved ? "room" : "home");
-  const [session, setSession] = useState<LocalSession | null>(saved);
+  // 공유 링크(?code=)는 최초 1회만 읽어 주소창에서 제거합니다.
+  const [boot] = useState(() => {
+    const savedSession = loadSession();
+    return { saved: savedSession, ...getInitialView(savedSession) };
+  });
+  const [view, setView] = useState<View>(boot.view);
+  const [inviteCode, setInviteCode] = useState(boot.inviteCode);
+  const [session, setSession] = useState<LocalSession | null>(boot.saved);
   const [pendingNickname, setPendingNickname] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { room, participants, answers, loading, error: syncError } = useRoomSync(session?.roomId ?? null);
+  const { room, participants, answers, placeVotes, loading, error: syncError } = useRoomSync(
+    session?.roomId ?? null,
+  );
 
   const me = useMemo(
     () => participants.find((person) => person.id === session?.participantId) ?? null,
@@ -52,7 +70,6 @@ export default function App() {
   );
 
   const answerList = useMemo(() => {
-    // 완료한 참가자 순서대로 답변을 모아 점수 계산에 사용합니다.
     return participants
       .filter((person) => person.is_done)
       .map((person) => answers.find((row) => row.participant_id === person.id)?.payload)
@@ -61,22 +78,26 @@ export default function App() {
 
   const allDone = participants.length > 0 && participants.every((person) => person.is_done);
 
+  const placeCandidates = useMemo(() => {
+    const raw = room?.place_candidates;
+    return Array.isArray(raw) ? (raw as KakaoPlace[]) : null;
+  }, [room?.place_candidates]);
+
   function resetToHome() {
     clearSession();
     setSession(null);
     setPendingNickname("");
+    setInviteCode("");
     setError(null);
     setView("home");
   }
 
-  /** 닉네임만 받은 뒤, 지도에서 위치를 고르는 단계로 넘어갑니다. */
   async function handleCreateNickname(values: { nickname: string }) {
     setError(null);
     setPendingNickname(values.nickname.trim());
     setView("pick-location");
   }
 
-  /** 선택한 위치와 닉네임으로 방을 생성합니다. */
   async function handleCreateWithLocation(location: RoomLocation) {
     setBusy(true);
     setError(null);
@@ -98,6 +119,7 @@ export default function App() {
     try {
       const next = await joinRoom(values.code || "", values.nickname);
       setSession(next);
+      setInviteCode("");
       setView("room");
     } catch (err) {
       setError(err instanceof Error ? err.message : "입장에 실패했어요.");
@@ -151,7 +173,7 @@ export default function App() {
         setError(null);
         setView("join");
       }}
-      canResume={Boolean(saved)}
+      canResume={Boolean(boot.saved || loadSession())}
       onResume={() => {
         setSession(loadSession());
         setView("room");
@@ -188,7 +210,11 @@ export default function App() {
         mode="join"
         busy={busy}
         error={error}
-        onBack={() => setView("home")}
+        initialCode={inviteCode}
+        onBack={() => {
+          setInviteCode("");
+          setView("home");
+        }}
         onSubmit={handleJoin}
       />
     );
@@ -242,11 +268,16 @@ export default function App() {
     } else if (allDone && answerList.length > 0) {
       content = (
         <ResultsScreen
+          roomId={session.roomId}
+          participantId={session.participantId}
           nicknames={participants.map((person) => person.nickname)}
           answerList={answerList}
           roomLat={room?.lat ?? null}
           roomLng={room?.lng ?? null}
           locationName={room?.location_name ?? null}
+          placeCandidates={placeCandidates}
+          placeVotes={placeVotes}
+          participantCount={participants.length}
           onRestart={resetToHome}
         />
       );
