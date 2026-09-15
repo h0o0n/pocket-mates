@@ -24,6 +24,7 @@ const load = <T,>(key: string, fallback: T): T => {
 const won = (value: number) => value.toLocaleString('ko-KR')
 
 export default function App() {
+  const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history'>('expense')
   const [plan, setPlan] = useState<BudgetPlan>(() => load('pocket-plan', defaultPlan))
   const [draftPlan, setDraftPlan] = useState(plan)
   const [expenses, setExpenses] = useState<Expense[]>(() => load('pocket-expenses', []))
@@ -76,8 +77,14 @@ export default function App() {
     <div className="meter"><span style={{ width: `${Math.max(0, Math.min(100, snapshot.remainingRatio * 100))}%` }} /></div>
     <p className="status-line">{status} · 생활예산의 {Math.max(0, Math.round(snapshot.remainingRatio * 100))}%가 남았어요.</p>
 
+    <nav className="mobile-tabs" aria-label="가계부 메뉴">
+      <button className={activePanel === 'expense' ? 'active' : ''} onClick={() => setActivePanel('expense')}><span>＋</span>소비 기록</button>
+      <button className={activePanel === 'budget' ? 'active' : ''} onClick={() => setActivePanel('budget')}><span>₩</span>예산 설정</button>
+      <button className={activePanel === 'history' ? 'active' : ''} onClick={() => setActivePanel('history')}><span>≡</span>내역 {expenses.length}</button>
+    </nav>
+
     <section className="forms-grid">
-      <form className="paper-card" onSubmit={saveExpense}>
+      <form className={`paper-card mobile-section ${activePanel === 'expense' ? 'is-active' : ''}`} onSubmit={saveExpense}>
         <div className="card-heading"><div><small>SPENDING</small><h2>소비 기록하기</h2></div><span>01</span></div>
         <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
         <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
@@ -85,7 +92,7 @@ export default function App() {
         <button className="save-button" type="submit">기록하고 강아지에게 알리기</button>
       </form>
 
-      <form className="paper-card" onSubmit={savePlan}>
+      <form className={`paper-card mobile-section ${activePanel === 'budget' ? 'is-active' : ''}`} onSubmit={savePlan}>
         <div className="card-heading"><div><small>MONTHLY PLAN</small><h2>이번 달 기준 정하기</h2></div><span>02</span></div>
         <label>월급<div className="won-input"><input type="number" value={draftPlan.monthlyIncome} onChange={e => updatePlan('monthlyIncome', e.target.value)}/><span>원</span></div></label>
         <label>매달 나가는 고정비<div className="won-input"><input type="number" value={draftPlan.fixedExpenses} onChange={e => updatePlan('fixedExpenses', e.target.value)}/><span>원</span></div></label>
@@ -95,7 +102,7 @@ export default function App() {
     </section>
     {message && <p className="toast" role="status">{message}</p>}
 
-    <section className="history">
+    <section className={`history mobile-section ${activePanel === 'history' ? 'is-active' : ''}`}>
       <div className="history-title"><div><small>THIS MONTH</small><h2>이번 달 기록</h2></div><b>{expenses.length}건</b></div>
       {expenses.length === 0 ? <p className="empty">아직 쓴 돈이 없습니다. 강아지는 평온합니다.</p> : <ul>{expenses.slice(0, 8).map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
     </section>
