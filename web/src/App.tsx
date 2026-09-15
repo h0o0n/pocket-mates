@@ -42,6 +42,7 @@ const load = <T,>(key: string, fallback: T): T => {
   try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback } catch { return fallback }
 }
 const won = (value: number) => value.toLocaleString('ko-KR')
+const todayKey = new Date().toLocaleDateString('en-CA')
 
 export default function App() {
   const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
@@ -57,12 +58,16 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
+  const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
+  const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
+  const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const foodSpent = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).reduce((sum, x) => sum + x.amount, 0)
   const foodExpenseCount = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).length
   const shoppingCount = expenses.filter(x => x.category === 'shopping').length
   const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
   const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
+  const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
@@ -81,12 +86,30 @@ export default function App() {
   useEffect(() => localStorage.setItem('pocket-points', JSON.stringify(points)), [points])
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
+  useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
+  useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
+  useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
+
+  const dailyMissions = [
+    { id: 'expense-3', title: '오늘 소비 3건 기록', progress: Math.min(3, todayExpenseCount), goal: 3, reward: 50 },
+    { id: 'budget-check', title: '이번 달 예산 확인', progress: budgetChecked ? 1 : 0, goal: 1, reward: 20 },
+    { id: 'dog-talk-2', title: '강아지와 두 번 대화', progress: Math.min(2, dailyTalks), goal: 2, reward: 20 },
+  ]
+
+  useEffect(() => {
+    const newlyCompleted = dailyMissions.filter(mission => mission.progress >= mission.goal && !claimedMissions.includes(mission.id))
+    if (!newlyCompleted.length) return
+    const reward = newlyCompleted.reduce((sum, mission) => sum + mission.reward, 0)
+    setClaimedMissions(current => [...current, ...newlyCompleted.map(mission => mission.id)])
+    setPoints(current => current + reward)
+    setMessage(`일간 미션 완료! 뼈다귀 ${reward}개를 받았어요.`)
+  }, [todayExpenseCount, budgetChecked, dailyTalks])
 
   const savePlan = (event: FormEvent) => {
     event.preventDefault()
     if (draftPlan.monthlyIncome <= 0) return setMessage('월급은 0원보다 크게 입력해주세요.')
     if (draftPlan.fixedExpenses + draftPlan.savingsGoal > draftPlan.monthlyIncome) return setMessage('고정비와 저축 목표가 월급보다 많아요.')
-    setPlan(draftPlan); setMessage('이번 달 예산 설정을 저장했어요.')
+    setPlan(draftPlan); setBudgetChecked(true); setMessage('이번 달 예산 설정을 확인했어요.')
   }
   const saveExpense = (event: FormEvent) => {
     event.preventDefault()
@@ -94,7 +117,6 @@ export default function App() {
     if (!memo.trim()) return setMessage('어디에 썼는지 한 줄만 적어주세요.')
     if (!Number.isFinite(parsed) || parsed <= 0) return setMessage('사용 금액을 올바르게 입력해주세요.')
     setExpenses(list => [{ id: crypto.randomUUID(), category, amount: parsed, memo: memo.trim(), spentAt: new Date().toISOString() }, ...list])
-    setPoints(current => current + 15)
     setMemo(''); setAmount(''); setMessage(`${memo.trim()} ${won(parsed)}원을 기록했어요.`)
   }
   const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: Math.max(0, Number(value) || 0) }))
@@ -104,6 +126,7 @@ export default function App() {
     const candidates = lines.filter(candidate => candidate !== dogLine)
     setDogLine(candidates[Math.floor(Math.random() * candidates.length)] ?? lines[0])
     setBubbleVisible(true)
+    setDailyTalks(current => current + 1)
   }
   const useSkin = (skin: typeof roomSkins[number]) => {
     if (inventory.includes(skin.id)) { setEquippedSkin(skin.id); setMessage(`${skin.name}으로 방을 바꿨어요.`); return }
@@ -151,6 +174,14 @@ export default function App() {
     <section className="forms-grid">
       <form className={`paper-card mobile-section ${activePanel === 'expense' ? 'is-active' : ''}`} onSubmit={saveExpense}>
         <div className="card-heading"><div><small>SPENDING</small><h2>소비 기록하기</h2></div><span>01</span></div>
+        <div className="daily-missions">
+          <div className="mission-heading"><b>오늘의 미션</b><span>매일 자정 초기화</span></div>
+          {dailyMissions.map(mission => { const complete = claimedMissions.includes(mission.id); return <div className={`mission ${complete ? 'complete' : ''}`} key={mission.id}>
+            <span className="mission-check">{complete ? '✓' : `${mission.progress}/${mission.goal}`}</span>
+            <p>{mission.title}<small>🦴 {mission.reward}개</small></p>
+            <div><i style={{ width: `${Math.min(100, mission.progress / mission.goal * 100)}%` }} /></div>
+          </div> })}
+        </div>
         <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
         <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
         <label>얼마를 썼나요?<div className="won-input"><input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" min="1"/><span>원</span></div></label>
@@ -173,7 +204,7 @@ export default function App() {
     </section>
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
       <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
-      <p className="shop-guide">소비를 기록하면 뼈다귀 15개를 받아요. 구입한 방은 소지품에 남아 언제든 다시 사용할 수 있습니다.</p>
+      <p className="shop-guide">매일 미션을 완료하면 뼈다귀를 받아요. 구입한 방은 소지품에 남아 언제든 다시 사용할 수 있습니다.</p>
       <div className="skin-grid">{roomSkins.map(skin => { const owned = inventory.includes(skin.id); const equipped = equippedSkin === skin.id; return <article key={skin.id} className={equipped ? 'equipped' : ''}>
         <img src={skin.image} alt={`${skin.name} 미리보기`} />
         <div><h3>{skin.name}</h3><p>{skin.description}</p></div>

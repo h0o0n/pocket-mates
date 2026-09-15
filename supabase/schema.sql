@@ -371,3 +371,38 @@ $$;
 
 revoke all on function public.purchase_shop_item(text) from public, anon;
 grant execute on function public.purchase_shop_item(text) to authenticated;
+
+create table if not exists public.daily_mission_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  mission_date date not null default current_date,
+  mission_id text not null check (char_length(mission_id) between 1 and 40),
+  progress integer not null default 0 check (progress >= 0),
+  goal integer not null check (goal > 0),
+  reward integer not null check (reward >= 0),
+  completed_at timestamptz,
+  claimed_at timestamptz,
+  primary key (user_id, mission_date, mission_id)
+);
+
+create index if not exists daily_mission_progress_user_date_idx
+  on public.daily_mission_progress (user_id, mission_date desc);
+
+alter table public.daily_mission_progress enable row level security;
+revoke all on table public.daily_mission_progress from anon, authenticated;
+grant select, insert, update on table public.daily_mission_progress to authenticated;
+
+drop policy if exists "daily_missions_select_own" on public.daily_mission_progress;
+create policy "daily_missions_select_own"
+  on public.daily_mission_progress for select to authenticated
+  using ((select auth.uid()) is not null and (select auth.uid()) = user_id);
+
+drop policy if exists "daily_missions_insert_own" on public.daily_mission_progress;
+create policy "daily_missions_insert_own"
+  on public.daily_mission_progress for insert to authenticated
+  with check ((select auth.uid()) is not null and (select auth.uid()) = user_id);
+
+drop policy if exists "daily_missions_update_own" on public.daily_mission_progress;
+create policy "daily_missions_update_own"
+  on public.daily_mission_progress for update to authenticated
+  using ((select auth.uid()) is not null and (select auth.uid()) = user_id)
+  with check ((select auth.uid()) is not null and (select auth.uid()) = user_id);
