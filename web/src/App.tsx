@@ -48,6 +48,11 @@ const load = <T,>(key: string, fallback: T): T => {
   try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback } catch { return fallback }
 }
 const won = (value: number) => value.toLocaleString('ko-KR')
+const numberFromInput = (value: string) => Number(value.replace(/[^0-9]/g, '')) || 0
+const formattedInput = (value: string | number) => {
+  const digits = String(value).replace(/[^0-9]/g, '')
+  return digits ? Number(digits).toLocaleString('ko-KR') : ''
+}
 const todayKey = new Date().toLocaleDateString('en-CA')
 const stableIndex = (value: string, length: number) => [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0) % length
 
@@ -101,6 +106,11 @@ export default function App() {
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
   useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
+  useEffect(() => {
+    if (!message) return
+    const timer = window.setTimeout(() => setMessage(''), 2400)
+    return () => window.clearTimeout(timer)
+  }, [message])
 
   const dailyMissions = [
     { id: 'expense-3', title: '오늘 소비 3건 기록', progress: Math.min(3, todayExpenseCount), goal: 3, reward: 50 },
@@ -125,13 +135,14 @@ export default function App() {
   }
   const saveExpense = (event: FormEvent) => {
     event.preventDefault()
-    const parsed = Number(amount)
+    const parsed = numberFromInput(amount)
     if (!memo.trim()) return setMessage('어디에 썼는지 한 줄만 적어주세요.')
     if (!Number.isFinite(parsed) || parsed <= 0) return setMessage('사용 금액을 올바르게 입력해주세요.')
     setExpenses(list => [{ id: crypto.randomUUID(), category, amount: parsed, memo: memo.trim(), spentAt: new Date().toISOString() }, ...list])
     setMemo(''); setAmount(''); setMessage(`${memo.trim()} ${won(parsed)}원을 기록했어요.`)
   }
-  const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: Math.max(0, Number(value) || 0) }))
+  const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: numberFromInput(value) }))
+  const addQuickAmount = (value: number) => setAmount(current => String(numberFromInput(current) + value))
   const categoryInfo = (value: ExpenseCategory) => categories.find(x => x.value === value) ?? categories.at(-1)!
   const talkToDog = () => {
     const lines = dialogue[snapshot.stage]
@@ -195,15 +206,21 @@ export default function App() {
         </div>
         <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
         <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
-        <label>얼마를 썼나요?<div className="won-input"><input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" min="1"/><span>원</span></div></label>
+        <label>얼마를 썼나요?<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(amount)} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0"/><span>원</span></div></label>
+        <div className="quick-amounts" aria-label="금액 빠르게 더하기">
+          <button type="button" onClick={() => addQuickAmount(100_000)}>+100,000</button>
+          <button type="button" onClick={() => addQuickAmount(10_000)}>+10,000</button>
+          <button type="button" onClick={() => addQuickAmount(1_000)}>+1,000</button>
+          <button type="button" className="clear-amount" onClick={() => setAmount('')}>초기화</button>
+        </div>
         <button className="save-button" type="submit">기록하고 강아지에게 알리기</button>
       </form>
 
       <form className={`paper-card mobile-section ${activePanel === 'budget' ? 'is-active' : ''}`} onSubmit={savePlan}>
         <div className="card-heading"><div><small>MONTHLY PLAN</small><h2>이번 달 기준 정하기</h2></div><span>02</span></div>
-        <label>월급<div className="won-input"><input type="number" value={draftPlan.monthlyIncome} onChange={e => updatePlan('monthlyIncome', e.target.value)}/><span>원</span></div></label>
-        <label>매달 나가는 고정비<div className="won-input"><input type="number" value={draftPlan.fixedExpenses} onChange={e => updatePlan('fixedExpenses', e.target.value)}/><span>원</span></div></label>
-        <label>저축 목표<div className="won-input"><input type="number" value={draftPlan.savingsGoal} onChange={e => updatePlan('savingsGoal', e.target.value)}/><span>원</span></div></label>
+        <label>월급<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.monthlyIncome)} onChange={e => updatePlan('monthlyIncome', e.target.value)}/><span>원</span></div></label>
+        <label>매달 나가는 고정비<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.fixedExpenses)} onChange={e => updatePlan('fixedExpenses', e.target.value)}/><span>원</span></div></label>
+        <label>저축 목표<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.savingsGoal)} onChange={e => updatePlan('savingsGoal', e.target.value)}/><span>원</span></div></label>
         <button className="save-button secondary" type="submit">이번 달 예산 저장하기</button>
       </form>
     </section>
