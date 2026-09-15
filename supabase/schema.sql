@@ -277,3 +277,97 @@ create policy "monthly_summaries_delete_own"
 
 revoke execute on function private.set_updated_at() from public, anon, authenticated;
 revoke execute on function private.handle_new_user() from public, anon, authenticated;
+
+-- 방 스킨 상점과 사용자별 소지품
+alter table public.profiles
+  add column if not exists points bigint not null default 500 check (points >= 0);
+
+create table if not exists public.shop_items (
+  id text primary key check (char_length(id) between 1 and 40),
+  item_type text not null check (item_type in ('room_skin', 'decoration')),
+  name text not null check (char_length(name) between 1 and 40),
+  description text check (description is null or char_length(description) <= 160),
+  price integer not null check (price >= 0),
+  asset_path text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+insert into public.shop_items (id, item_type, name, description, price, asset_path)
+values
+  ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/room/attic-cozy.png'),
+  ('cloud', 'room_skin', '새벽 구름방', '구름 위로 아침이 오는 방', 250, '/assets/skins/cloud-dawn.png'),
+  ('game', 'room_skin', '주말 게임방', '잔액보다 세이브 파일이 중요한 방', 400, '/assets/skins/weekend-game.png')
+on conflict (id) do update set
+  name = excluded.name,
+  description = excluded.description,
+  price = excluded.price,
+  asset_path = excluded.asset_path;
+
+create table if not exists public.user_inventory (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  item_id text not null references public.shop_items (id) on delete restrict,
+  purchased_at timestamptz not null default now(),
+  primary key (user_id, item_id)
+);
+
+alter table public.companion_states
+  add column if not exists equipped_room_skin text not null default 'attic';
+
+create index if not exists user_inventory_user_id_idx
+  on public.user_inventory (user_id);
+
+alter table public.shop_items enable row level security;
+alter table public.user_inventory enable row level security;
+
+revoke all on table public.shop_items from anon, authenticated;
+revoke all on table public.user_inventory from anon, authenticated;
+grant select on table public.shop_items to authenticated;
+grant select on table public.user_inventory to authenticated;
+
+drop policy if exists "shop_items_select_active" on public.shop_items;
+create policy "shop_items_select_active"
+  on public.shop_items for select to authenticated
+  using (is_active = true);
+
+drop policy if exists "user_inventory_select_own" on public.user_inventory;
+create policy "user_inventory_select_own"
+  on public.user_inventory for select to authenticated
+  using ((select auth.uid()) is not null and (select auth.uid()) = user_id);
+
+create or replace function public.purchase_shop_item(p_item_id text)
+returns public.user_inventory
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  requested_item public.shop_items;
+  purchased_item public.user_inventory;
+begin
+  if auth.uid() is null then raise exception '로그인이 필요합니다.'; end if;
+
+  select * into requested_item
+  from public.shop_items
+  where id = p_item_id and is_active = true;
+
+  if not found then raise exception '판매 중인 상품이 아닙니다.'; end if;
+  if exists (select 1 from public.user_inventory where user_id = auth.uid() and item_id = p_item_id) then
+    raise exception '이미 보유한 상품입니다.';
+  end if;
+
+  update public.profiles
+  set points = points - requested_item.price
+  where id = auth.uid() and points >= requested_item.price;
+
+  if not found then raise exception '포인트가 부족합니다.'; end if;
+
+  insert into public.user_inventory (user_id, item_id)
+  values (auth.uid(), p_item_id)
+  returning * into purchased_item;
+  return purchased_item;
+end;
+$$;
+
+revoke all on function public.purchase_shop_item(text) from public, anon;
+grant execute on function public.purchase_shop_item(text) to authenticated;
