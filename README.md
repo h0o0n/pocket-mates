@@ -29,3 +29,8 @@ npm run build
 Vercel은 루트의 `vercel.json` 설정을 사용합니다.
 
 Supabase 테이블과 RLS 정책은 `supabase/schema.sql`에 있습니다.
+
+## 프로젝트 문서
+
+- 디자인 파일 위치와 추가 규칙: `docs/ASSETS.md`
+- 최초 기획 대비 변경 내역과 버전별 기록: `docs/PATCH_NOTES.md`

@@ -18,23 +18,23 @@ const copy = {
   speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
 const roomImages = {
-  relaxed: '/assets/room/attic-cozy.png',
-  watching: '/assets/room/attic-lived-in.png',
-  calculating: '/assets/room/attic-worn.png',
-  worried: '/assets/room/attic-struggling.png',
-  speechless: '/assets/room/attic-broke.png',
+  relaxed: '/assets/rooms/budget-states/attic-cozy.png',
+  watching: '/assets/rooms/budget-states/attic-lived-in.png',
+  calculating: '/assets/rooms/budget-states/attic-worn.png',
+  worried: '/assets/rooms/budget-states/attic-struggling.png',
+  speechless: '/assets/rooms/budget-states/attic-broke.png',
 } as const
 type SkinId = 'attic' | 'cloud' | 'game'
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
-  { id: 'attic', name: '밤의 다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/room/attic-cozy.png' },
-  { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/skins/cloud-dawn.png' },
-  { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/skins/weekend-game.png' },
+  { id: 'attic', name: '밤의 다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
+  { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
+  { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
 ]
 const foodProps = [
-  '/assets/props/delivery-clutter.png',
-  '/assets/props/food-chicken.png',
-  '/assets/props/food-cafe.png',
-  '/assets/props/food-late-night.png',
+  '/assets/props/food/delivery-clutter.png',
+  '/assets/props/food/food-chicken.png',
+  '/assets/props/food/food-cafe.png',
+  '/assets/props/food/food-late-night.png',
 ] as const
 const dialogue = {
   relaxed: ['왜 불렀어? 아직은 평화로운데.', '잔액 좋고, 창밖 좋고. 오늘은 합격.', '아무것도 안 사는 것도 능력이다.', '지금의 나를 기억해 둬. 곧 표정 바뀔 수도 있어.'],
@@ -97,12 +97,12 @@ export default function App() {
   const equippedRoom = roomSkins.find(skin => skin.id === equippedSkin) ?? roomSkins[0]
   const roomImage = equippedSkin === 'attic' ? roomImages[snapshot.stage] : equippedRoom.image
   const dogImage = foodLevel === 2
-    ? '/assets/characters/dog-very-chubby.png'
+    ? '/assets/characters/states/dog-very-chubby.png'
     : foodLevel === 1
-      ? '/assets/characters/dog-chubby.png'
+      ? '/assets/characters/states/dog-chubby.png'
       : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
-        ? '/assets/characters/dog-receipt.png'
-        : '/assets/characters/dog-neutral.png'
+        ? '/assets/characters/states/dog-receipt.png'
+        : '/assets/characters/states/dog-neutral.png'
 
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
@@ -212,7 +212,7 @@ export default function App() {
       {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
       <div className="prop-layer" aria-hidden="true">
         {deliveryPiles.map((source, index) => <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />)}
-        {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
+        {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
       </div>
       <div className="dog-wrap">
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
