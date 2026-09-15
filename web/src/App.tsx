@@ -41,6 +41,10 @@ export default function App() {
   const [message, setMessage] = useState('')
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const foodSpent = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).reduce((sum, x) => sum + x.amount, 0)
+  const foodExpenseCount = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).length
+  const shoppingCount = expenses.filter(x => x.category === 'shopping').length
+  const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
+  const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
   const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
@@ -77,6 +81,10 @@ export default function App() {
 
     <section className={`attic stage-${snapshot.stage}`} aria-label="강아지의 다락방">
       <img className="room-art" src={roomImages[snapshot.stage]} alt={`남은 예산에 따라 ${status} 상태가 된 다락방`} />
+      <div className="prop-layer" aria-hidden="true">
+        {Array.from({ length: deliveryPileCount }, (_, index) => <img className="room-prop delivery-prop" src="/assets/props/delivery-clutter.png" alt="" key={`food-${index}`} />)}
+        {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
+      </div>
       <div className="dog-wrap"><span className="speech">{line}</span><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />{foodLevel > 0 && <span className="food-badge">식비 비중 {Math.round(foodRatio * 100)}%</span>}</div>
     </section>
 
