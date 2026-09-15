@@ -27,3 +27,5 @@ npm run build
 ```
 
 Vercel은 루트의 `vercel.json` 설정을 사용합니다.
+
+Supabase 테이블과 RLS 정책은 `supabase/schema.sql`에 있습니다.

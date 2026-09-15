@@ -7,3 +7,10 @@ node_modules
 web/.env
 .DS_Store
 *.log
+
+# 로컬 참고용 이미지 (앱 소스와 무관)
+images/
+.tmp-gta6/
+
+# 로컬 드래프트·프롬프트
+drafts/
