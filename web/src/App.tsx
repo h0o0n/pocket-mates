@@ -76,6 +76,9 @@ export default function App() {
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
   const [viewMonth, setViewMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState(todayKey)
+  const [historyView, setHistoryView] = useState<'calendar' | 'list'>('calendar')
+  const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
+  const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const foodExpenses = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
   const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
@@ -133,6 +136,26 @@ export default function App() {
   }, {})
   const selectedExpenses = expensesByDate[selectedDate] ?? []
   const selectedTotal = selectedExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const selectedBaseDate = new Date(`${selectedDate}T12:00:00`)
+  const weekStart = new Date(selectedBaseDate)
+  weekStart.setDate(selectedBaseDate.getDate() - selectedBaseDate.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 7)
+  const periodExpenses = expenses.filter(expense => {
+    const spentDate = new Date(expense.spentAt)
+    if (listPeriod === 'daily') return dateKey(spentDate) === selectedDate
+    if (listPeriod === 'weekly') return spentDate >= weekStart && spentDate < weekEnd
+    return spentDate.getFullYear() === selectedBaseDate.getFullYear() && spentDate.getMonth() === selectedBaseDate.getMonth()
+  })
+  const visibleListExpenses = periodExpenses
+    .filter(expense => listCategory === 'all' || expense.category === listCategory)
+    .sort((a, b) => Date.parse(b.spentAt) - Date.parse(a.spentAt))
+  const listTotal = visibleListExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const categoryBreakdown = categories.map(info => ({
+    ...info,
+    total: periodExpenses.filter(expense => expense.category === info.value).reduce((sum, expense) => sum + expense.amount, 0),
+  })).filter(item => item.total > 0).sort((a, b) => b.total - a.total)
 
   useEffect(() => {
     const newlyCompleted = dailyMissions.filter(mission => mission.progress >= mission.goal && !claimedMissions.includes(mission.id))
@@ -248,19 +271,27 @@ export default function App() {
     {message && <p className="toast" role="status">{message}</p>}
 
     <section className={`history mobile-section ${activePanel === 'history' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>CALENDAR</small><h2>날짜별 소비 기록</h2></div><b>{expenses.length}건</b></div>
-      <div className="calendar-head"><button onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button><strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong><button onClick={() => moveMonth(1)} aria-label="다음 달">›</button></div>
-      <div className="weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
-      <div className="calendar-grid">{calendarCells.map((day, index) => {
-        if (!day) return <span className="calendar-blank" key={`blank-${index}`} />
-        const key = dateKey(day); const dayExpenses = expensesByDate[key] ?? []; const isSelected = key === selectedDate; const isToday = key === todayKey
-        return <button className={`${isSelected ? 'selected ' : ''}${isToday ? 'today' : ''}`} onClick={() => setSelectedDate(key)} key={key}>
-          <span className="day-number">{day.getDate()}</span>
-          <span className="day-icons">{dayExpenses.slice(0, 3).map(expense => <i key={expense.id}>{categoryInfo(expense.category).emoji}</i>)}{dayExpenses.length > 3 && <small>+{dayExpenses.length - 3}</small>}</span>
-        </button>
-      })}</div>
-      <div className="selected-day-head"><div><b>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b><small>{selectedExpenses.length}건</small></div><strong>{won(selectedTotal)}원</strong></div>
-      {selectedExpenses.length === 0 ? <p className="empty">이날은 기록이 없습니다.</p> : <ul>{selectedExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
+      <div className="history-title"><div><small>HISTORY</small><h2>소비 기록</h2></div><b>{expenses.length}건</b></div>
+      <div className="view-switch"><button className={historyView === 'calendar' ? 'active' : ''} onClick={() => setHistoryView('calendar')}>달력으로 보기</button><button className={historyView === 'list' ? 'active' : ''} onClick={() => setHistoryView('list')}>리스트로 보기</button></div>
+      {historyView === 'calendar' ? <>
+        <div className="calendar-head"><button onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button><strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong><button onClick={() => moveMonth(1)} aria-label="다음 달">›</button></div>
+        <div className="weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div className="calendar-grid">{calendarCells.map((day, index) => {
+          if (!day) return <span className="calendar-blank" key={`blank-${index}`} />
+          const key = dateKey(day); const dayExpenses = expensesByDate[key] ?? []; const isSelected = key === selectedDate; const isToday = key === todayKey
+          return <button className={`${isSelected ? 'selected ' : ''}${isToday ? 'today' : ''}`} onClick={() => setSelectedDate(key)} key={key}>
+            <span className="day-number">{day.getDate()}</span>
+            <span className="day-icons">{dayExpenses.slice(0, 3).map(expense => <i key={expense.id}>{categoryInfo(expense.category).emoji}</i>)}{dayExpenses.length > 3 && <small>+{dayExpenses.length - 3}</small>}</span>
+          </button>
+        })}</div>
+        <div className="selected-day-head"><div><b>{selectedBaseDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b><small>{selectedExpenses.length}건</small></div><strong>{won(selectedTotal)}원</strong></div>
+        {selectedExpenses.length === 0 ? <p className="empty">이날은 기록이 없습니다.</p> : <ul>{selectedExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
+      </> : <>
+        <div className="list-filters"><div>{(['daily', 'weekly', 'monthly'] as const).map(period => <button className={listPeriod === period ? 'active' : ''} onClick={() => setListPeriod(period)} key={period}>{period === 'daily' ? '일간' : period === 'weekly' ? '주간' : '월간'}</button>)}</div><select value={listCategory} onChange={event => setListCategory(event.target.value as 'all' | ExpenseCategory)}><option value="all">전체 유형</option>{categories.map(info => <option value={info.value} key={info.value}>{info.emoji} {info.label}</option>)}</select></div>
+        <div className="category-breakdown">{categoryBreakdown.length ? categoryBreakdown.map(item => <button className={listCategory === item.value ? 'active' : ''} onClick={() => setListCategory(item.value)} key={item.value}><span>{item.emoji}</span><small>{item.label}</small><b>{won(item.total)}원</b></button>) : <p>이 기간에는 기록이 없습니다.</p>}</div>
+        <div className="selected-day-head"><div><b>{listPeriod === 'daily' ? '선택한 날' : listPeriod === 'weekly' ? '선택한 주' : '선택한 달'}</b><small>{visibleListExpenses.length}건 · {listCategory === 'all' ? '전체 유형' : categoryInfo(listCategory).label}</small></div><strong>{won(listTotal)}원</strong></div>
+        {visibleListExpenses.length === 0 ? <p className="empty">조건에 맞는 기록이 없습니다.</p> : <ul>{visibleListExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
+      </>}
     </section>
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
       <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
