@@ -30,6 +30,12 @@ const roomSkins: Array<{ id: SkinId; name: string; description: string; price: n
   { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/skins/cloud-dawn.png' },
   { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/skins/weekend-game.png' },
 ]
+const foodProps = [
+  '/assets/props/delivery-clutter.png',
+  '/assets/props/food-chicken.png',
+  '/assets/props/food-cafe.png',
+  '/assets/props/food-late-night.png',
+] as const
 const dialogue = {
   relaxed: ['왜 불렀어? 아직은 평화로운데.', '잔액 좋고, 창밖 좋고. 오늘은 합격.', '아무것도 안 사는 것도 능력이다.', '지금의 나를 기억해 둬. 곧 표정 바뀔 수도 있어.'],
   watching: ['슬슬 영수증이 말을 걸기 시작했어.', '그 결제, 미래의 네가 허락한 거 맞아?', '아직 괜찮아. 아직은.', '장바구니는 비웠는데 왜 잔액도 비었지?'],
@@ -43,6 +49,7 @@ const load = <T,>(key: string, fallback: T): T => {
 }
 const won = (value: number) => value.toLocaleString('ko-KR')
 const todayKey = new Date().toLocaleDateString('en-CA')
+const stableIndex = (value: string, length: number) => [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0) % length
 
 export default function App() {
   const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
@@ -62,11 +69,16 @@ export default function App() {
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
-  const foodSpent = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).reduce((sum, x) => sum + x.amount, 0)
-  const foodExpenseCount = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).length
+  const foodExpenses = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
+  const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
+  const foodExpenseCount = foodExpenses.length
   const shoppingCount = expenses.filter(x => x.category === 'shopping').length
   const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
   const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
+  const deliveryPiles = Array.from({ length: deliveryPileCount }, (_, index) => {
+    const seedExpense = foodExpenses[index * 3 + 2] ?? foodExpenses[index * 3]
+    return foodProps[stableIndex(seedExpense?.id ?? String(index), foodProps.length)]
+  })
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
@@ -144,14 +156,13 @@ export default function App() {
       <img className="room-art" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
       {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
       <div className="prop-layer" aria-hidden="true">
-        {Array.from({ length: deliveryPileCount }, (_, index) => <img className="room-prop delivery-prop" src="/assets/props/delivery-clutter.png" alt="" key={`food-${index}`} />)}
+        {deliveryPiles.map((source, index) => <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />)}
         {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
       </div>
       <div className="dog-wrap">
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
         <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기"><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} /></button>
         {!bubbleVisible && <span className="talk-hint">강아지를 눌러보세요</span>}
-        {foodLevel > 0 && <span className="food-badge">식비 비중 {Math.round(foodRatio * 100)}%</span>}
       </div>
     </section>
 
