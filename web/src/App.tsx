@@ -1,60 +1,103 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { calculateBudget } from './domain/index.ts'
-import type { Expense, ExpenseCategory } from './domain/types.ts'
+import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
 
-const plan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
-const items: Array<{label:string; amount:number; category:ExpenseCategory; emoji:string}> = [
-  { label:'커피', amount:5_500, category:'coffee', emoji:'☕' },
-  { label:'배달', amount:28_000, category:'delivery', emoji:'🍕' },
-  { label:'쇼핑', amount:89_000, category:'shopping', emoji:'📦' },
-  { label:'게임', amount:69_800, category:'game', emoji:'🎮' },
+const defaultPlan: BudgetPlan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
+const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }> = [
+  { value: 'coffee', label: '카페·커피', emoji: '☕' }, { value: 'delivery', label: '배달', emoji: '🍕' },
+  { value: 'dining', label: '외식', emoji: '🍚' }, { value: 'transport', label: '교통', emoji: '🚌' },
+  { value: 'shopping', label: '쇼핑', emoji: '📦' }, { value: 'game', label: '게임', emoji: '🎮' },
+  { value: 'subscription', label: '구독', emoji: '📺' }, { value: 'living', label: '생활', emoji: '🧻' },
+  { value: 'other', label: '기타', emoji: '✏️' },
 ]
 const copy = {
-  relaxed:['평화로움','이번 달은 아직 창밖을 볼 여유가 있다.'],
-  watching:['슬슬 보는 중','방금 그 결제, 꼭 필요했던 거 맞지?'],
-  calculating:['계산기 등장','강아지가 영수증을 모으기 시작했다.'],
-  worried:['집안 사정 회의','전등 하나 끄면 해결되는 문제인가.'],
-  speechless:['말을 잃음','강아지와 방이 동시에 낡아가고 있다.'],
+  relaxed: ['평화로움', '이번 달은 아직 창밖을 볼 여유가 있다.'],
+  watching: ['슬슬 보는 중', '방금 그 결제, 꼭 필요했던 거 맞지?'],
+  calculating: ['계산기 등장', '강아지가 영수증을 모으기 시작했다.'],
+  worried: ['집안 사정 회의', '전등 하나 끄면 해결되는 문제인가.'],
+  speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
 
-function Dog({stage, foodLevel}:{stage:keyof typeof copy; foodLevel:number}) {
-  const worried = stage === 'worried' || stage === 'speechless'
-  const mouth = stage === 'relaxed' ? 'M93 112 Q100 118 107 112' : worried ? 'M94 117 Q100 111 106 117' : 'M95 115 L105 115'
-  const scale = 1 + foodLevel * .11
-  return <svg className="dog" viewBox="0 0 200 230" role="img" aria-label={`강아지 상태: ${copy[stage][0]}`}>
-    <ellipse className="dog-shadow" cx="100" cy="215" rx="65" ry="10" />
-    <g className="dog-body" style={{transform:`translateX(${100-100*scale}px) scaleX(${scale})`}}>
-      <path d="M53 140Q51 106 72 91Q100 75 128 92Q150 108 147 142L151 191Q149 211 126 210L74 210Q50 211 49 190Z" />
-      <path className="belly" d="M73 154Q100 137 127 154Q134 185 119 202L81 202Q66 184 73 154Z" />
-    </g>
-    <path className="ear" d="M67 55Q42 56 48 91Q55 104 73 89Z"/><path className="ear" d="M133 55Q158 56 152 91Q145 104 127 89Z"/>
-    <path className="head" d="M62 91Q59 50 100 45Q141 50 138 91Q140 133 100 141Q60 133 62 91Z"/>
-    <circle className="eye" cx="82" cy="88" r={worried?3.5:3}/><circle className="eye" cx="118" cy="88" r={worried?3.5:3}/>
-    <path className="snout" d="M76 100Q100 89 124 100Q126 126 100 130Q74 126 76 100Z"/><ellipse className="nose" cx="100" cy="104" rx="9" ry="6"/><path className="mouth" d={mouth}/>
-    {stage==='calculating'&&<text className="prop" x="154" y="154">⌨</text>}{stage==='worried'&&<text className="sweat" x="139" y="77">💧</text>}{stage==='speechless'&&<text className="prop" x="153" y="153">…</text>}
-    <path className="paw" d="M62 184Q54 210 72 214"/><path className="paw" d="M138 184Q146 210 128 214"/>
-  </svg>
+const load = <T,>(key: string, fallback: T): T => {
+  try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback } catch { return fallback }
 }
+const won = (value: number) => value.toLocaleString('ko-KR')
 
-export default function App(){
-  const [expenses,setExpenses]=useState<Expense[]>([])
-  const snapshot=useMemo(()=>calculateBudget(plan,expenses),[expenses])
-  const foodSpent=expenses.filter(x=>['coffee','delivery','dining'].includes(x.category)).reduce((s,x)=>s+x.amount,0)
-  const foodLevel=Math.min(3,Math.floor(foodSpent/70_000))
-  const [status,line]=copy[snapshot.stage]
-  const spend=(category:ExpenseCategory,amount:number)=>setExpenses(list=>[...list,{id:crypto.randomUUID(),category,amount,spentAt:new Date().toISOString()}])
+export default function App() {
+  const [plan, setPlan] = useState<BudgetPlan>(() => load('pocket-plan', defaultPlan))
+  const [draftPlan, setDraftPlan] = useState(plan)
+  const [expenses, setExpenses] = useState<Expense[]>(() => load('pocket-expenses', []))
+  const [category, setCategory] = useState<ExpenseCategory>('dining')
+  const [memo, setMemo] = useState('')
+  const [amount, setAmount] = useState('')
+  const [message, setMessage] = useState('')
+  const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
+  const foodSpent = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).reduce((sum, x) => sum + x.amount, 0)
+  const foodLevel = Math.min(3, Math.floor(foodSpent / 70_000))
+  const [status, line] = copy[snapshot.stage]
+  const dogImage = snapshot.stage === 'worried' || snapshot.stage === 'speechless'
+    ? '/assets/characters/dog-receipt.png' : foodLevel > 0 ? '/assets/characters/dog-chubby.png' : '/assets/characters/dog-neutral.png'
+
+  useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
+  useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
+
+  const savePlan = (event: FormEvent) => {
+    event.preventDefault()
+    if (draftPlan.monthlyIncome <= 0) return setMessage('월급은 0원보다 크게 입력해주세요.')
+    if (draftPlan.fixedExpenses + draftPlan.savingsGoal > draftPlan.monthlyIncome) return setMessage('고정비와 저축 목표가 월급보다 많아요.')
+    setPlan(draftPlan); setMessage('이번 달 예산 설정을 저장했어요.')
+  }
+  const saveExpense = (event: FormEvent) => {
+    event.preventDefault()
+    const parsed = Number(amount)
+    if (!memo.trim()) return setMessage('어디에 썼는지 한 줄만 적어주세요.')
+    if (!Number.isFinite(parsed) || parsed <= 0) return setMessage('사용 금액을 올바르게 입력해주세요.')
+    setExpenses(list => [{ id: crypto.randomUUID(), category, amount: parsed, memo: memo.trim(), spentAt: new Date().toISOString() }, ...list])
+    setMemo(''); setAmount(''); setMessage(`${memo.trim()} ${won(parsed)}원을 기록했어요.`)
+  }
+  const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: Math.max(0, Number(value) || 0) }))
+  const categoryInfo = (value: ExpenseCategory) => categories.find(x => x.value === value) ?? categories.at(-1)!
+
   return <main className="app-shell">
-    <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={()=>setExpenses([])} disabled={!expenses.length}>이번 달 다시 시작</button></header>
+    <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
+
     <section className={`attic stage-${snapshot.stage}`} aria-label="강아지의 다락방">
-      <div className="roof roof-left"/><div className="roof roof-right"/><div className="beam beam-left"/><div className="beam beam-right"/>
-      <div className="window"><div className="moon"/><span className="building one"/><span className="building two"/><span className="building three"/></div>
-      <div className="lamp"><span/></div><div className="shelf"><i/><i/><i/></div><div className="plant">⌇</div>
-      <div className="crack crack-one"/><div className="crack crack-two"/><div className="wall-stain stain-one"/><div className="wall-stain stain-two"/><div className="rug"/>
-      <div className="dog-wrap"><span className="speech">{line}</span><Dog stage={snapshot.stage} foodLevel={foodLevel}/>{foodLevel>0&&<span className="food-badge">배부름 +{foodLevel}</span>}</div>
-      <div className="moving-box">잔액<br/>보관함</div>
+      <img className="room-art" src="/assets/room/attic-cozy.png" alt="밤 도시가 보이는 아늑한 다락방" />
+      <div className="room-wear" aria-hidden="true"><i/><i/><i/></div>
+      <div className="dog-wrap"><span className="speech">{line}</span><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />{foodLevel > 0 && <span className="food-badge">배부름 +{foodLevel}</span>}</div>
     </section>
-    <section className="dashboard"><div className="balance-card"><p>이번 달 쓸 수 있는 돈</p><strong>{snapshot.remainingBalance.toLocaleString('ko-KR')}원</strong><div className="meter"><span style={{width:`${Math.max(0,snapshot.remainingRatio*100)}%`}}/></div><small>{status} · 총 {snapshot.totalSpent.toLocaleString('ko-KR')}원 사용</small></div>
-      <div className="spend-panel"><p className="panel-title">방금 뭘 샀나요?</p><div className="quick-grid">{items.map(x=><button key={x.category} onClick={()=>spend(x.category,x.amount)}><span>{x.emoji}</span><b>{x.label}</b><small>{x.amount.toLocaleString('ko-KR')}원</small></button>)}</div><p className="hint">배달·커피를 자주 누르면 강아지 배가 먼저 반응합니다.</p></div>
+
+    <section className="summary-grid">
+      <article><span>월급</span><strong>{won(plan.monthlyIncome)}원</strong></article>
+      <article><span>고정비 제외 생활예산</span><strong>{won(snapshot.spendableBudget)}원</strong></article>
+      <article className="remaining"><span>현재 남은 돈</span><strong>{won(snapshot.remainingBalance)}원</strong></article>
+      <article><span>이번 달 사용</span><strong>{won(snapshot.totalSpent)}원</strong></article>
+    </section>
+    <div className="meter"><span style={{ width: `${Math.max(0, Math.min(100, snapshot.remainingRatio * 100))}%` }} /></div>
+    <p className="status-line">{status} · 생활예산의 {Math.max(0, Math.round(snapshot.remainingRatio * 100))}%가 남았어요.</p>
+
+    <section className="forms-grid">
+      <form className="paper-card" onSubmit={saveExpense}>
+        <div className="card-heading"><div><small>SPENDING</small><h2>소비 기록하기</h2></div><span>01</span></div>
+        <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
+        <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
+        <label>얼마를 썼나요?<div className="won-input"><input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" min="1"/><span>원</span></div></label>
+        <button className="save-button" type="submit">기록하고 강아지에게 알리기</button>
+      </form>
+
+      <form className="paper-card" onSubmit={savePlan}>
+        <div className="card-heading"><div><small>MONTHLY PLAN</small><h2>이번 달 기준 정하기</h2></div><span>02</span></div>
+        <label>월급<div className="won-input"><input type="number" value={draftPlan.monthlyIncome} onChange={e => updatePlan('monthlyIncome', e.target.value)}/><span>원</span></div></label>
+        <label>매달 나가는 고정비<div className="won-input"><input type="number" value={draftPlan.fixedExpenses} onChange={e => updatePlan('fixedExpenses', e.target.value)}/><span>원</span></div></label>
+        <label>저축 목표<div className="won-input"><input type="number" value={draftPlan.savingsGoal} onChange={e => updatePlan('savingsGoal', e.target.value)}/><span>원</span></div></label>
+        <button className="save-button secondary" type="submit">이번 달 예산 저장하기</button>
+      </form>
+    </section>
+    {message && <p className="toast" role="status">{message}</p>}
+
+    <section className="history">
+      <div className="history-title"><div><small>THIS MONTH</small><h2>이번 달 기록</h2></div><b>{expenses.length}건</b></div>
+      {expenses.length === 0 ? <p className="empty">아직 쓴 돈이 없습니다. 강아지는 평온합니다.</p> : <ul>{expenses.slice(0, 8).map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
     </section>
   </main>
 }
