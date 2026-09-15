@@ -55,6 +55,7 @@ const formattedInput = (value: string | number) => {
 }
 const todayKey = new Date().toLocaleDateString('en-CA')
 const stableIndex = (value: string, length: number) => [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0) % length
+const dateKey = (date: Date) => date.toLocaleDateString('en-CA')
 
 export default function App() {
   const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
@@ -73,6 +74,8 @@ export default function App() {
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
+  const [viewMonth, setViewMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [selectedDate, setSelectedDate] = useState(todayKey)
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const foodExpenses = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
   const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
@@ -117,6 +120,19 @@ export default function App() {
     { id: 'budget-check', title: '이번 달 예산 확인', progress: budgetChecked ? 1 : 0, goal: 1, reward: 20 },
     { id: 'dog-talk-2', title: '강아지와 두 번 대화', progress: Math.min(2, dailyTalks), goal: 2, reward: 20 },
   ]
+  const firstWeekday = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1).getDay()
+  const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate()
+  const calendarCells = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(viewMonth.getFullYear(), viewMonth.getMonth(), index + 1)),
+  ]
+  const expensesByDate = expenses.reduce<Record<string, Expense[]>>((grouped, expense) => {
+    const key = dateKey(new Date(expense.spentAt))
+    grouped[key] = [...(grouped[key] ?? []), expense]
+    return grouped
+  }, {})
+  const selectedExpenses = expensesByDate[selectedDate] ?? []
+  const selectedTotal = selectedExpenses.reduce((sum, expense) => sum + expense.amount, 0)
 
   useEffect(() => {
     const newlyCompleted = dailyMissions.filter(mission => mission.progress >= mission.goal && !claimedMissions.includes(mission.id))
@@ -158,6 +174,11 @@ export default function App() {
     setInventory(current => [...current, skin.id])
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
+  }
+  const moveMonth = (offset: number) => {
+    const next = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + offset, 1)
+    setViewMonth(next)
+    setSelectedDate(dateKey(next))
   }
 
   return <main className="app-shell">
@@ -227,8 +248,19 @@ export default function App() {
     {message && <p className="toast" role="status">{message}</p>}
 
     <section className={`history mobile-section ${activePanel === 'history' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>THIS MONTH</small><h2>이번 달 기록</h2></div><b>{expenses.length}건</b></div>
-      {expenses.length === 0 ? <p className="empty">아직 쓴 돈이 없습니다. 강아지는 평온합니다.</p> : <ul>{expenses.slice(0, 8).map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
+      <div className="history-title"><div><small>CALENDAR</small><h2>날짜별 소비 기록</h2></div><b>{expenses.length}건</b></div>
+      <div className="calendar-head"><button onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button><strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong><button onClick={() => moveMonth(1)} aria-label="다음 달">›</button></div>
+      <div className="weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+      <div className="calendar-grid">{calendarCells.map((day, index) => {
+        if (!day) return <span className="calendar-blank" key={`blank-${index}`} />
+        const key = dateKey(day); const dayExpenses = expensesByDate[key] ?? []; const isSelected = key === selectedDate; const isToday = key === todayKey
+        return <button className={`${isSelected ? 'selected ' : ''}${isToday ? 'today' : ''}`} onClick={() => setSelectedDate(key)} key={key}>
+          <span className="day-number">{day.getDate()}</span>
+          <span className="day-icons">{dayExpenses.slice(0, 3).map(expense => <i key={expense.id}>{categoryInfo(expense.category).emoji}</i>)}{dayExpenses.length > 3 && <small>+{dayExpenses.length - 3}</small>}</span>
+        </button>
+      })}</div>
+      <div className="selected-day-head"><div><b>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b><small>{selectedExpenses.length}건</small></div><strong>{won(selectedTotal)}원</strong></div>
+      {selectedExpenses.length === 0 ? <p className="empty">이날은 기록이 없습니다.</p> : <ul>{selectedExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
     </section>
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
       <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
