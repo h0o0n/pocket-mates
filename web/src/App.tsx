@@ -17,6 +17,13 @@ const copy = {
   worried: ['집안 사정 회의', '전등 하나 끄면 해결되는 문제인가.'],
   speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
+const roomImages = {
+  relaxed: '/assets/room/attic-cozy.png',
+  watching: '/assets/room/attic-lived-in.png',
+  calculating: '/assets/room/attic-worn.png',
+  worried: '/assets/room/attic-struggling.png',
+  speechless: '/assets/room/attic-broke.png',
+} as const
 
 const load = <T,>(key: string, fallback: T): T => {
   try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback } catch { return fallback }
@@ -34,10 +41,16 @@ export default function App() {
   const [message, setMessage] = useState('')
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const foodSpent = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).reduce((sum, x) => sum + x.amount, 0)
-  const foodLevel = Math.min(3, Math.floor(foodSpent / 70_000))
+  const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
+  const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
-  const dogImage = snapshot.stage === 'worried' || snapshot.stage === 'speechless'
-    ? '/assets/characters/dog-receipt.png' : foodLevel > 0 ? '/assets/characters/dog-chubby.png' : '/assets/characters/dog-neutral.png'
+  const dogImage = foodLevel === 2
+    ? '/assets/characters/dog-very-chubby.png'
+    : foodLevel === 1
+      ? '/assets/characters/dog-chubby.png'
+      : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
+        ? '/assets/characters/dog-receipt.png'
+        : '/assets/characters/dog-neutral.png'
 
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
@@ -63,9 +76,8 @@ export default function App() {
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
     <section className={`attic stage-${snapshot.stage}`} aria-label="강아지의 다락방">
-      <img className="room-art" src="/assets/room/attic-cozy.png" alt="밤 도시가 보이는 아늑한 다락방" />
-      <div className="room-wear" aria-hidden="true"><i/><i/><i/></div>
-      <div className="dog-wrap"><span className="speech">{line}</span><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />{foodLevel > 0 && <span className="food-badge">배부름 +{foodLevel}</span>}</div>
+      <img className="room-art" src={roomImages[snapshot.stage]} alt={`남은 예산에 따라 ${status} 상태가 된 다락방`} />
+      <div className="dog-wrap"><span className="speech">{line}</span><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />{foodLevel > 0 && <span className="food-badge">식비 비중 {Math.round(foodRatio * 100)}%</span>}</div>
     </section>
 
     <section className="summary-grid">
