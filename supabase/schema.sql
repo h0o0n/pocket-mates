@@ -295,9 +295,9 @@ create table if not exists public.shop_items (
 
 insert into public.shop_items (id, item_type, name, description, price, asset_path)
 values
-  ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/room/attic-cozy.png'),
-  ('cloud', 'room_skin', '새벽 구름방', '구름 위로 아침이 오는 방', 250, '/assets/skins/cloud-dawn.png'),
-  ('game', 'room_skin', '주말 게임방', '잔액보다 세이브 파일이 중요한 방', 400, '/assets/skins/weekend-game.png')
+  ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/rooms/budget-states/attic-cozy.png'),
+  ('cloud', 'room_skin', '새벽 구름방', '구름 위로 아침이 오는 방', 250, '/assets/rooms/skins/cloud-dawn.png'),
+  ('game', 'room_skin', '주말 게임방', '잔액보다 세이브 파일이 중요한 방', 400, '/assets/rooms/skins/weekend-game.png')
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
