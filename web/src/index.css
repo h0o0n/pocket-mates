@@ -1,82 +1,69 @@
-:root{--ink:#27231f;--muted:#746c64;--cream:#fff9ef;--paper:#fffefa;--orange:#ff6933;--orange-dark:#e94f1c;--yellow:#ffd858;--green:#8aae5b;--line:#eadfce;--shadow:0 18px 55px rgba(75,48,25,.12)}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);background:radial-gradient(circle at 15% 12%,#ffe8bc 0,transparent 25%),radial-gradient(circle at 86% 78%,#ffe0d2 0,transparent 27%),var(--cream);font-family:"Gowun Dodum",sans-serif}.shell{width:min(1120px,calc(100% - 32px));margin:auto;min-height:100vh}.topbar{height:86px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px;border:0;background:none;font:22px "Jua",sans-serif;color:var(--ink);cursor:pointer}.brand-mark{display:grid;place-items:center;width:42px;height:42px;color:#fff;background:var(--orange);border-radius:14px 14px 18px 10px;transform:rotate(-4deg)}.today{color:var(--muted);font-size:14px}.screen{display:none}.screen.active{display:grid;animation:fade .35s ease}@keyframes fade{from{opacity:0;transform:translateY(8px)}}#home{grid-template-columns:1fr 1fr;align-items:center;min-height:calc(100vh - 155px);position:relative}.hero-copy{padding:40px 0 130px}.eyebrow,.step{display:inline-block;color:var(--orange-dark);background:#fff0e8;padding:7px 12px;border-radius:999px;font-size:14px;font-weight:bold;letter-spacing:.04em}.hero-copy h1,.result-head h2{font:clamp(48px,6.4vw,82px)/.99 "Jua",sans-serif;margin:23px 0 24px;letter-spacing:-.035em}.hero-copy h1 em,.result-head em{font-style:normal;color:var(--orange)}.hero-copy p{font-size:19px;line-height:1.75;color:var(--muted);margin:0 0 30px}.primary,.secondary{border:0;border-radius:16px;padding:16px 22px;font:16px "Jua",sans-serif;cursor:pointer;transition:.2s}.primary{background:var(--orange);color:#fff;box-shadow:0 9px 0 #cb4217}.primary:hover{transform:translateY(-2px);box-shadow:0 11px 0 #cb4217}.primary:active{transform:translateY(6px);box-shadow:0 3px 0 #cb4217}.primary:disabled{background:#d8cfc5;box-shadow:0 7px 0 #b8afa5;cursor:not-allowed}.primary span{margin-left:22px}.secondary{background:#f2eadf;color:var(--ink)}.text-btn{margin-left:18px;border:0;background:none;text-decoration:underline;color:var(--muted);cursor:pointer}.hidden{display:none!important}.hero-visual{display:grid;place-items:center}.plate{width:min(430px,42vw);aspect-ratio:1;border-radius:50%;background:var(--paper);border:25px solid #fff;box-shadow:var(--shadow),inset 0 0 0 2px #f2e7d8;position:relative;animation:float 5s ease-in-out infinite}@keyframes float{50%{transform:translateY(-9px) rotate(1deg)}}.food{position:absolute;font-size:clamp(42px,5vw,70px);filter:drop-shadow(0 8px 5px #d7c9b7)}.f1{left:15%;top:13%}.f2{right:10%;top:20%}.f3{left:12%;bottom:15%}.f4{right:14%;bottom:12%}.f5{left:40%;top:39%}.center-dot{position:absolute;display:grid;place-items:center;inset:40%;background:var(--yellow);border-radius:50%;font:34px "Jua"}.spark{position:absolute;color:var(--orange);font-size:32px}.s1{right:5%;top:20%}.s2{left:1%;bottom:24%}.how-card{position:absolute;bottom:24px;left:0;right:0;background:rgba(255,255,255,.72);backdrop-filter:blur(14px);border:1px solid #fff;border-radius:22px;display:flex;align-items:center;gap:22px;padding:18px 25px;box-shadow:0 12px 35px rgba(83,59,38,.08)}.how-card>strong{margin-right:auto;font-family:"Jua"}.how-card div{display:flex;align-items:center;gap:9px}.how-card b{display:grid;place-items:center;width:31px;height:31px;background:var(--yellow);border-radius:50%}.how-card span{font-size:13px;line-height:1.25;color:var(--muted)}.how-card i{width:24px;height:1px;background:var(--line)}
-.panel{width:min(760px,100%);margin:35px auto 80px;background:rgba(255,254,250,.92);border:1px solid #fff;border-radius:30px;box-shadow:var(--shadow);padding:38px}.panel.compact{width:min(620px,100%)}.back{border:0;background:none;color:var(--muted);cursor:pointer;padding:5px 0;margin-right:14px}.panel h2{font:38px "Jua";margin:25px 0 6px}.sub{color:var(--muted);margin:0 0 25px}.member-form{display:flex;gap:10px}.member-form input{flex:1;border:2px solid var(--line);background:#fff;padding:15px 17px;border-radius:14px;font:16px inherit;outline:none}.member-form input:focus{border-color:var(--orange)}.member-form button{width:76px;border:0;border-radius:14px;background:var(--ink);color:#fff;font:16px "Jua";cursor:pointer}.member-list{display:grid;gap:9px;margin:19px 0;min-height:55px}.member{display:flex;align-items:center;padding:10px 13px;background:#fff7e8;border-radius:14px}.member .mini-avatar,.answering span,.next-person>span{display:grid;place-items:center;width:36px;height:36px;background:var(--yellow);border-radius:50%;font-family:"Jua";margin-right:10px}.member button{margin-left:auto;border:0;background:none;color:#a79a8c;font-size:18px;cursor:pointer}.tip{padding:14px 16px;background:#edf3e5;border-radius:14px;color:#567037;font-size:14px;line-height:1.5;margin:20px 0}.full{width:100%;margin-top:9px}.question-panel{min-height:560px}.question-head{display:flex;align-items:center;gap:16px}.progress-wrap{height:8px;flex:1;border-radius:99px;background:#eee5da;overflow:hidden}.progress{height:100%;width:0;background:var(--orange);transition:.3s}.question-head>span{font-size:13px;color:var(--muted)}.answering{display:flex;align-items:center;justify-content:center;margin:30px 0;color:var(--muted)}.answering span{margin-right:7px}.answering b{color:var(--ink);margin-right:3px}.question-title{text-align:center;font:34px "Jua";margin:12px 0 8px}.question-hint{text-align:center;color:var(--muted);margin:0 0 26px}.options{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.option{border:2px solid var(--line);background:#fff;padding:17px;border-radius:16px;font:16px inherit;cursor:pointer;text-align:left;transition:.15s}.option:hover{border-color:#ffb08f}.option.selected{border-color:var(--orange);background:#fff1e9;box-shadow:inset 0 0 0 1px var(--orange)}.option .emoji{font-size:23px;margin-right:8px}.options.multi .option.selected:after{content:"✓";float:right;color:var(--orange);font-weight:bold}.question-actions{display:flex;justify-content:flex-end;gap:11px;margin-top:30px}.handoff-panel{text-align:center;width:min(500px,100%);padding:50px}.handoff-icon{font-size:62px;margin-bottom:18px}.handoff-panel h2{margin-top:20px}.handoff-panel p{color:var(--muted);line-height:1.7}.next-person{display:flex;align-items:center;text-align:left;background:#fff3da;border-radius:16px;padding:13px 16px;margin:28px 0}.next-person small,.next-person strong{display:block}.next-person small{color:var(--muted)}
-#results{padding:35px 0 80px}.result-head{text-align:center}.result-head h2{font-size:55px;margin:15px 0}.result-head p{color:var(--muted)}.result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:42px 0 30px}.result-card{position:relative;background:var(--paper);border:1px solid #fff;border-radius:25px;padding:24px;box-shadow:var(--shadow);overflow:hidden}.result-card:first-child{transform:translateY(-12px);border:3px solid var(--orange)}.rank{position:absolute;top:0;right:0;padding:9px 15px;background:var(--ink);color:white;border-radius:0 0 0 16px;font:16px "Jua"}.result-card:first-child .rank{background:var(--orange)}.menu-emoji{font-size:62px;display:block;margin:10px 0 16px}.result-card h3{font:27px "Jua";margin:0}.match{color:var(--orange-dark);font-weight:bold;margin:7px 0 16px}.reason{color:var(--muted);line-height:1.55;min-height:70px}.tags{display:flex;flex-wrap:wrap;gap:6px}.tags span{background:#f2eadf;border-radius:99px;padding:5px 9px;font-size:12px}.result-actions{display:flex;justify-content:center;gap:12px}.logic{width:min(700px,100%);margin:34px auto 0;color:var(--muted);background:rgba(255,255,255,.5);padding:15px 20px;border-radius:14px}.logic summary{cursor:pointer;color:var(--ink)}.logic p{line-height:1.6;font-size:14px}
-@media(max-width:760px){.shell{width:min(100% - 22px,1120px)}.topbar{height:68px}.today{display:none}#home{grid-template-columns:1fr;text-align:center}.hero-copy{padding:30px 0 10px}.hero-copy h1{font-size:52px}.hero-copy p{font-size:17px}.hero-visual{order:-1}.plate{width:250px;border-width:15px}.food{font-size:42px}.how-card{position:relative;bottom:auto;margin:30px 0 20px;text-align:left;padding:14px;gap:9px}.how-card>strong{display:none}.how-card i{flex:1}.panel{padding:23px;margin:15px auto 40px;border-radius:23px}.panel h2{font-size:31px}.options{grid-template-columns:1fr}.question-title{font-size:28px}.question-actions{position:sticky;bottom:8px}.result-grid{grid-template-columns:1fr;margin-top:30px}.result-card:first-child{transform:none}.result-head h2{font-size:43px}.result-actions{flex-direction:column}.result-actions button{width:100%}}
+:root {
+  font-family: Pretendard, Inter, system-ui, sans-serif;
+  color: #25221f;
+  background: #f7f3ea;
+  font-synthesis: none;
+}
 
-.home-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-.home-actions .text-btn{margin-left:0}
-.entry-form{display:grid;gap:16px}
-.entry-form label{display:grid;gap:8px;font-size:14px;color:var(--muted)}
-.entry-form input{border:2px solid var(--line);background:#fff;padding:15px 17px;border-radius:14px;font:16px inherit;outline:none;color:var(--ink);letter-spacing:.04em}
-.entry-form input:focus{border-color:var(--orange)}
-.form-error{color:#c0392b;background:#ffe8e4;border-radius:12px;padding:12px 14px;margin:0}
-.code-box{display:flex;align-items:center;gap:12px;background:#fff7e8;border-radius:18px;padding:16px 18px;margin:8px 0 20px}
-.code-box small{color:var(--muted)}
-.code-box strong{font:34px "Jua",sans-serif;letter-spacing:.12em;margin-right:auto}
-.ready-tag{margin-left:auto;font-style:normal;font-size:13px;color:var(--muted);background:#fff;padding:6px 10px;border-radius:999px}
-.ready-tag.done{color:#567037;background:#edf3e5}
-.wait-progress{margin:22px 0 8px;font:22px "Jua",sans-serif}
-.wait-list{text-align:left;margin-top:18px}
-.env-box{background:#27231f;color:#fff9ef;border-radius:16px;padding:18px;overflow:auto;font-size:13px;line-height:1.6}
-@media(max-width:760px){.home-actions{justify-content:center}.code-box{flex-wrap:wrap}.code-box strong{width:100%}}
+* {
+  box-sizing: border-box;
+}
 
-/* 위치 선택 / 주변 음식점 지도 */
-.panel.map-panel{width:min(760px,100%)}
-.map-search{display:flex;gap:10px;margin-bottom:12px}
-.map-search input{flex:1;border:2px solid var(--line);background:#fff;padding:14px 16px;border-radius:14px;font:16px inherit;outline:none}
-.map-search input:focus{border-color:var(--orange)}
-.map-hits{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:8px;max-height:180px;overflow:auto}
-.map-hits button{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 14px;cursor:pointer;display:grid;gap:4px}
-.map-hits button:hover{border-color:#ffb08f;background:#fff8f3}
-.map-hits strong{font-family:"Jua",sans-serif;font-size:16px}
-.map-hits span{color:var(--muted);font-size:13px}
-.map-canvas{width:100%;height:320px;border-radius:18px;overflow:hidden;border:2px solid var(--line);background:#efe7db}
-.map-selected{margin:14px 0 6px;padding:14px 16px;background:#fff7e8;border-radius:14px;display:grid;gap:4px}
-.map-selected small{color:var(--muted);font-size:13px}
-.map-selected strong{font-family:"Jua",sans-serif;font-size:18px;line-height:1.35}
-.map-hint{margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
-.location-chip{margin:0 0 16px;padding:14px 16px;background:#edf3e5;border-radius:14px;display:grid;gap:4px;color:#567037}
-.location-chip small{font-size:13px;opacity:.85}
-.location-chip strong{font-family:"Jua",sans-serif;font-size:18px;color:var(--ink)}
-.nearby-section{width:min(900px,100%);margin:10px auto 40px;background:rgba(255,254,250,.92);border:1px solid #fff;border-radius:28px;box-shadow:var(--shadow);padding:28px}
-.nearby-head{text-align:center;margin-bottom:18px}
-.nearby-head h3{font:32px "Jua",sans-serif;margin:12px 0 8px}
-.nearby-head p{margin:0;color:var(--muted);line-height:1.6}
-.nearby-status{text-align:center;color:var(--muted);margin:20px auto}
-.nearby-map{margin:16px 0 18px;height:280px}
-.nearby-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.nearby-list li{display:flex;align-items:stretch;gap:10px;background:#fff7e8;border-radius:16px;padding:10px 12px}
-.nearby-list li.active{outline:2px solid var(--orange);background:#fff1e9}
-.nearby-list button{flex:1;border:0;background:none;text-align:left;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:4px;color:inherit;font:inherit}
-.nearby-rank{display:grid;place-items:center;min-width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;font:14px "Jua",sans-serif}
-.nearby-list li.active .nearby-rank{background:var(--orange)}
-.nearby-list strong{display:block;font-family:"Jua",sans-serif;font-size:18px;margin-bottom:2px}
-.nearby-list em{display:inline-block;font-style:normal;color:var(--orange-dark);background:#fff;border-radius:999px;padding:2px 8px;font-size:12px;margin:2px 0 6px}
-.nearby-list span{display:block;color:var(--muted);font-size:13px;line-height:1.4}
-.nearby-list small{display:block;margin-top:4px;color:#567037;font-size:12px}
-.nearby-list a{white-space:nowrap;color:var(--orange-dark);font-size:12px;font-weight:bold}
-.nearby-list li{flex-wrap:wrap}
-.nearby-list .place-main{flex:1;min-width:200px;border:0;background:none;text-align:left;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:4px;color:inherit;font:inherit}
-.nearby-list .place-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
-.vote-btn{border:0;border-radius:12px;padding:8px 12px;background:var(--ink);color:#fff;font:13px "Jua",sans-serif;cursor:pointer}
-.vote-btn.selected{background:var(--orange)}
-.vote-btn:disabled{opacity:.6;cursor:not-allowed}
-.vote-count{color:var(--orange-dark)!important;font-weight:bold}
-.vote-progress{margin:0 0 12px;color:var(--muted);font-size:14px}
-.winner-banner{margin:0 0 18px;padding:18px;border-radius:18px;background:linear-gradient(135deg,#fff1e9,#ffe8bc);border:2px solid var(--orange);display:grid;gap:6px;text-align:center}
-.winner-banner small{color:var(--orange-dark);font-weight:bold}
-.winner-banner strong{font:28px "Jua",sans-serif}
-.winner-banner span{color:var(--muted);font-size:14px}
-.place-links{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:8px}
-.place-links a{color:var(--orange-dark);font-weight:bold;font-size:13px}
-.filter-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0 8px}
-.filter-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.filter-group>span{color:var(--muted);font-size:13px}
-.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font:13px "Jua",sans-serif;cursor:pointer}
-.chip.active{background:var(--orange);color:#fff;border-color:var(--orange)}
-.chip:disabled{opacity:.5;cursor:not-allowed}
-.nearby-list li.voted{outline:2px solid var(--green)}
-.share-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-.share-note{margin:0 0 14px;color:#567037;background:#edf3e5;border-radius:12px;padding:10px 12px;font-size:13px}
-@media(max-width:760px){.map-canvas,.nearby-map{height:240px}.nearby-section{padding:20px;border-radius:22px}.nearby-head h3{font-size:26px}.map-search{flex-direction:column}.nearby-list .place-actions{width:100%;margin-left:42px}.filter-bar{flex-direction:column;align-items:stretch}}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+.shell {
+  width: min(680px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 18vh 0 80px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #8a765f;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(36px, 7vw, 62px);
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+}
+
+.description {
+  margin: 24px 0 40px;
+  color: #68615a;
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.logic-card {
+  display: grid;
+  gap: 8px;
+  padding: 26px;
+  border: 1px solid #e4dacb;
+  border-radius: 22px;
+  background: #fffdf8;
+  box-shadow: 0 18px 50px rgb(83 67 48 / 8%);
+}
+
+.logic-card span,
+.logic-card p {
+  color: #7a7067;
+}
+
+.logic-card strong {
+  font-size: 34px;
+  letter-spacing: -0.04em;
+}
+
+.logic-card p {
+  margin: 0;
+  line-height: 1.6;
+}
