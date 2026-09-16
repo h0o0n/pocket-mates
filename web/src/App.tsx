@@ -42,6 +42,8 @@ const decorationSlots: Record<DecorationSlot, string> = {
   'floor-center': '가운데 바닥', tabletop: '테이블 위', 'wall-accent': '오른쪽 벽',
 }
 type DecorationZone = 'media' | 'wall' | 'table' | 'floor' | 'right'
+type TimePhase = 'auto' | 'day' | 'sunset' | 'night'
+type Placement = { left: number; top: number; width: number }
 const decorationZones: Array<{ value: DecorationZone; label: string; emoji: string }> = [
   { value: 'media', label: 'TV존', emoji: '📺' }, { value: 'wall', label: '벽', emoji: '🖼️' },
   { value: 'table', label: '테이블', emoji: '🪵' }, { value: 'floor', label: '바닥', emoji: '🧺' },
@@ -51,6 +53,32 @@ const slotZones: Record<DecorationSlot, DecorationZone> = {
   'media-screen': 'media', 'media-console': 'media', 'upper-wall': 'wall', 'wall-accent': 'wall',
   tabletop: 'table', 'floor-left': 'floor', 'floor-center': 'floor',
   'right-appliance': 'right', 'right-corner': 'right',
+}
+const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
+  attic: {
+    'media-screen': { left: 64, top: 48, width: 20 }, 'media-console': { left: 69, top: 70, width: 11 },
+    'upper-wall': { left: 38, top: 8, width: 21 }, 'wall-accent': { left: 88, top: 17, width: 8 },
+    tabletop: { left: 67, top: 55, width: 9 }, 'floor-left': { left: 4, top: 70, width: 14 },
+    'floor-center': { left: 38, top: 77, width: 22 }, 'right-appliance': { left: 88, top: 65, width: 9 },
+    'right-corner': { left: 86, top: 39, width: 10 },
+  },
+  cloud: {
+    'media-screen': { left: 65, top: 49, width: 21 }, 'media-console': { left: 70, top: 71, width: 11 },
+    'upper-wall': { left: 40, top: 8, width: 20 }, 'wall-accent': { left: 21, top: 18, width: 8 },
+    tabletop: { left: 84, top: 30, width: 8 }, 'floor-left': { left: 4, top: 72, width: 13 },
+    'floor-center': { left: 39, top: 78, width: 21 }, 'right-appliance': { left: 88, top: 65, width: 8 },
+    'right-corner': { left: 87, top: 44, width: 9 },
+  },
+  game: {
+    'media-screen': { left: 80, top: 31, width: 18 }, 'media-console': { left: 83, top: 62, width: 10 },
+    'upper-wall': { left: 39, top: 7, width: 21 }, 'wall-accent': { left: 18, top: 20, width: 8 },
+    tabletop: { left: 24, top: 43, width: 8 }, 'floor-left': { left: 5, top: 70, width: 13 },
+    'floor-center': { left: 40, top: 78, width: 20 }, 'right-appliance': { left: 90, top: 68, width: 7 },
+    'right-corner': { left: 91, top: 49, width: 7 },
+  },
+}
+const defaultRoomSets: Record<SkinId, string[]> = {
+  attic: ['mood-light', 'wall-clock'], cloud: ['string-lights', 'picnic-basket'], game: ['console', 'retro-radio'],
 }
 const decorations: Decoration[] = [
   { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, slot: 'media-screen', left: 5, top: 48, width: 23 },
@@ -115,6 +143,7 @@ export default function App() {
   const [equippedDecorations, setEquippedDecorations] = useState<string[]>(() => load('pocket-equipped-decorations', []))
   const [decorationZone, setDecorationZone] = useState<DecorationZone>('media')
   const [shopTab, setShopTab] = useState<'room' | 'store' | 'inventory'>('room')
+  const [timePhase, setTimePhase] = useState<TimePhase>(() => load('pocket-time-phase', 'auto'))
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
@@ -155,6 +184,20 @@ export default function App() {
     })
     return [...bySlot.values()]
   }, [equippedDecorations])
+  const displayedDecorations = useMemo(() => {
+    const equippedSlots = new Set(placedDecorations.map(item => item.slot))
+    const defaults = defaultRoomSets[equippedSkin]
+      .map(id => decorations.find(item => item.id === id))
+      .filter((item): item is Decoration => Boolean(item) && !equippedSlots.has(item!.slot))
+    return [...defaults, ...placedDecorations]
+  }, [equippedSkin, placedDecorations])
+  const resolvedTimePhase = useMemo(() => {
+    if (timePhase !== 'auto') return timePhase
+    const hour = new Date().getHours()
+    if (hour >= 7 && hour < 17) return 'day'
+    if (hour >= 17 && hour < 20) return 'sunset'
+    return 'night'
+  }, [timePhase])
 
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
@@ -163,6 +206,7 @@ export default function App() {
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
   useEffect(() => localStorage.setItem('pocket-decoration-inventory', JSON.stringify(decorationInventory)), [decorationInventory])
   useEffect(() => localStorage.setItem('pocket-equipped-decorations', JSON.stringify(equippedDecorations)), [equippedDecorations])
+  useEffect(() => localStorage.setItem('pocket-time-phase', JSON.stringify(timePhase)), [timePhase])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
   useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
@@ -280,7 +324,7 @@ export default function App() {
   return <main className="app-shell">
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
-    <section className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`} style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties} aria-label="강아지의 방">
+    <section className={`attic stage-${snapshot.stage} time-${resolvedTimePhase} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`} style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties} aria-label="강아지의 방">
       <img className="room-art" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
       {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
       <div className="prop-layer" aria-hidden="true">
@@ -288,8 +332,9 @@ export default function App() {
         {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
       </div>
       <div className="decoration-layer" aria-hidden="true">
-        {placedDecorations.map(item => <span className="placed-decoration" key={item.id} style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--item-left': `${item.left}%`, '--item-top': `${item.top}%`, '--item-width': `${item.width}%` } as CSSProperties} />)}
+        {displayedDecorations.map(item => { const placement = roomPlacements[equippedSkin][item.slot]; const scale = item.width / ({ 'media-screen': 23, 'media-console': 10, 'upper-wall': 20, 'right-appliance': 9, 'right-corner': 10, 'floor-left': 13, 'floor-center': 20, tabletop: 8, 'wall-accent': 8 } as Record<DecorationSlot, number>)[item.slot]; return <span className="placed-decoration" key={`${equippedSkin}-${item.id}`} style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--item-left': `${placement.left}%`, '--item-top': `${placement.top}%`, '--item-width': `${placement.width * scale}%` } as CSSProperties} /> })}
       </div>
+      <div className="time-switch" aria-label="방 시간대"><button className={timePhase === 'auto' ? 'active' : ''} onClick={() => setTimePhase('auto')}>자동</button><button className={timePhase === 'day' ? 'active' : ''} onClick={() => setTimePhase('day')}>낮</button><button className={timePhase === 'sunset' ? 'active' : ''} onClick={() => setTimePhase('sunset')}>노을</button><button className={timePhase === 'night' ? 'active' : ''} onClick={() => setTimePhase('night')}>밤</button></div>
       <div className="dog-wrap">
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
         <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기"><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} /></button>
