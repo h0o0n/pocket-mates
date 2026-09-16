@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { calculateBudget } from './domain/index.ts'
+import { FlatRoom } from './room/FlatRoom'
+import { FlatArt } from './room/FlatArt'
+import { decorations, decorationSlots, decorationZones, slotZones, roomSkins, defaultRoomSets, starterFurnitureIds, normalizeItems, type SkinId, type Decoration, type DecorationZone, type TimePhase } from './room/catalog'
 import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
 
 const defaultPlan: BudgetPlan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
@@ -17,120 +20,6 @@ const copy = {
   worried: ['집안 사정 회의', '전등 하나 끄면 해결되는 문제인가.'],
   speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
-const roomImages = {
-  relaxed: '/assets/rooms/empty-attic-night.png', watching: '/assets/rooms/empty-attic-night.png',
-  calculating: '/assets/rooms/empty-attic-night.png', worried: '/assets/rooms/empty-attic-night.png',
-  speechless: '/assets/rooms/empty-attic-night.png',
-} as const
-type SkinId = 'attic' | 'cloud' | 'game'
-const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
-  { id: 'attic', name: '밤의 다락방', description: '가구 없이 시작하는 따뜻한 다락방', price: 0, image: '/assets/rooms/empty-attic-night.png' },
-  { id: 'cloud', name: '새벽 구름방', description: '노을과 구름이 보이는 빈 방', price: 250, image: '/assets/rooms/empty-cloud-sunset.png' },
-  { id: 'game', name: '주말 게임방', description: '게임방으로 꾸밀 수 있는 빈 공간', price: 400, image: '/assets/rooms/empty-game-night.png' },
-]
-type DecorationCategory = 'appliance' | 'christmas' | 'picnic' | 'lighting' | 'retro'
-type DecorationSlot = 'media-screen' | 'media-console' | 'upper-wall' | 'right-appliance' | 'right-corner' | 'floor-left' | 'floor-center' | 'tabletop' | 'wall-accent' | 'bed' | 'storage' | 'main-rug' | 'seating' | 'media-unit' | 'side-table' | 'wall-shelf' | 'plant'
-type Decoration = {
-  id: string; name: string; description: string; category: DecorationCategory; price: number
-  spriteX: number; spriteY: number; slot: DecorationSlot; left: number; top: number; width: number
-  asset?: string; columns?: number; rows?: number
-}
-const decorationSlots: Record<DecorationSlot, string> = {
-  'media-screen': '왼쪽 TV 자리', 'media-console': 'TV 아래', 'upper-wall': '위쪽 벽',
-  'right-appliance': '오른쪽 가전 자리', 'right-corner': '오른쪽 구석', 'floor-left': '왼쪽 바닥',
-  'floor-center': '가운데 바닥', tabletop: '테이블 위', 'wall-accent': '오른쪽 벽',
-  bed: '왼쪽 침실 자리', storage: '오른쪽 수납 자리', 'main-rug': '가운데 러그 자리',
-  seating: '왼쪽 휴식 자리', 'media-unit': '오른쪽 TV장 자리', 'side-table': '침대 옆',
-  'wall-shelf': '벽 선반 자리', plant: '창가 화분 자리',
-}
-type DecorationZone = 'media' | 'wall' | 'table' | 'floor' | 'right'
-type TimePhase = 'auto' | 'day' | 'sunset' | 'night'
-type Placement = { left: number; top: number; width: number }
-const decorationZones: Array<{ value: DecorationZone; label: string; emoji: string }> = [
-  { value: 'media', label: 'TV존', emoji: '📺' }, { value: 'wall', label: '벽', emoji: '🖼️' },
-  { value: 'table', label: '테이블', emoji: '🪵' }, { value: 'floor', label: '바닥', emoji: '🧺' },
-  { value: 'right', label: '오른쪽', emoji: '🪴' },
-]
-const slotZones: Record<DecorationSlot, DecorationZone> = {
-  'media-screen': 'media', 'media-console': 'media', 'upper-wall': 'wall', 'wall-accent': 'wall',
-  tabletop: 'table', 'floor-left': 'floor', 'floor-center': 'floor',
-  'right-appliance': 'right', 'right-corner': 'right',
-  bed: 'floor', seating: 'floor', 'main-rug': 'floor', storage: 'right', 'media-unit': 'right',
-  'side-table': 'floor', 'wall-shelf': 'wall', plant: 'right',
-}
-const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
-  attic: {
-    'media-screen': { left: 64, top: 48, width: 20 }, 'media-console': { left: 69, top: 70, width: 11 },
-    'upper-wall': { left: 38, top: 8, width: 21 }, 'wall-accent': { left: 88, top: 17, width: 8 },
-    tabletop: { left: 67, top: 55, width: 9 }, 'floor-left': { left: 4, top: 70, width: 14 },
-    'floor-center': { left: 38, top: 77, width: 22 }, 'right-appliance': { left: 88, top: 65, width: 9 },
-    'right-corner': { left: 86, top: 39, width: 10 },
-    bed: { left: 2, top: 43, width: 36 }, storage: { left: 78, top: 39, width: 20 },
-    'main-rug': { left: 31, top: 69, width: 42 }, seating: { left: 2, top: 47, width: 37 },
-    'media-unit': { left: 65, top: 58, width: 28 }, 'side-table': { left: 32, top: 54, width: 12 },
-    'wall-shelf': { left: 76, top: 25, width: 21 }, plant: { left: 73, top: 55, width: 11 },
-  },
-  cloud: {
-    'media-screen': { left: 65, top: 49, width: 21 }, 'media-console': { left: 70, top: 71, width: 11 },
-    'upper-wall': { left: 40, top: 8, width: 20 }, 'wall-accent': { left: 21, top: 18, width: 8 },
-    tabletop: { left: 84, top: 30, width: 8 }, 'floor-left': { left: 4, top: 72, width: 13 },
-    'floor-center': { left: 39, top: 78, width: 21 }, 'right-appliance': { left: 88, top: 65, width: 8 },
-    'right-corner': { left: 87, top: 44, width: 9 },
-    bed: { left: 2, top: 45, width: 36 }, storage: { left: 80, top: 40, width: 18 },
-    'main-rug': { left: 31, top: 70, width: 42 }, seating: { left: 2, top: 49, width: 37 },
-    'media-unit': { left: 66, top: 59, width: 27 }, 'side-table': { left: 32, top: 56, width: 11 },
-    'wall-shelf': { left: 78, top: 26, width: 19 }, plant: { left: 74, top: 56, width: 10 },
-  },
-  game: {
-    'media-screen': { left: 80, top: 31, width: 18 }, 'media-console': { left: 83, top: 62, width: 10 },
-    'upper-wall': { left: 39, top: 7, width: 21 }, 'wall-accent': { left: 18, top: 20, width: 8 },
-    tabletop: { left: 24, top: 43, width: 8 }, 'floor-left': { left: 5, top: 70, width: 13 },
-    'floor-center': { left: 40, top: 78, width: 20 }, 'right-appliance': { left: 90, top: 68, width: 7 },
-    'right-corner': { left: 91, top: 49, width: 7 },
-    bed: { left: 2, top: 44, width: 34 }, storage: { left: 80, top: 39, width: 18 },
-    'main-rug': { left: 31, top: 70, width: 42 }, seating: { left: 1, top: 48, width: 38 },
-    'media-unit': { left: 69, top: 57, width: 29 }, 'side-table': { left: 30, top: 55, width: 12 },
-    'wall-shelf': { left: 3, top: 19, width: 21 }, plant: { left: 74, top: 55, width: 10 },
-  },
-}
-const defaultRoomSets: Record<SkinId, string[]> = {
-  attic: ['furniture-bed', 'furniture-bookcase', 'furniture-rug', 'furniture-side-table', 'furniture-plant', 'mood-light'],
-  cloud: ['furniture-bed', 'furniture-rug', 'furniture-side-table', 'furniture-wall-shelf', 'furniture-plant'],
-  game: ['furniture-sofa', 'furniture-tv-unit', 'furniture-rug', 'furniture-wall-shelf', 'furniture-plant', 'tv', 'console'],
-}
-const decorations: Decoration[] = [
-  { id: 'furniture-bed', name: '포근한 침대', description: '방의 절반을 차지하는 행복', category: 'retro', price: 0, spriteX: 0, spriteY: 0, slot: 'seating', left: 0, top: 0, width: 36, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-bookcase', name: '원목 책장', description: '읽은 책보다 장식이 더 많음', category: 'retro', price: 0, spriteX: 1, spriteY: 0, slot: 'storage', left: 0, top: 0, width: 20, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-rug', name: '타원 러그', description: '강아지가 제일 먼저 차지함', category: 'retro', price: 0, spriteX: 2, spriteY: 0, slot: 'main-rug', left: 0, top: 0, width: 42, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-sofa', name: '남색 소파', description: '게임 켜고 그대로 잠드는 자리', category: 'retro', price: 0, spriteX: 3, spriteY: 0, slot: 'seating', left: 0, top: 0, width: 38, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-tv-unit', name: '원목 TV장', description: '게임기들이 모이는 본진', category: 'retro', price: 0, spriteX: 0, spriteY: 1, slot: 'storage', left: 0, top: 0, width: 20, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-side-table', name: '둥근 협탁', description: '컵 하나 올리면 꽉 참', category: 'retro', price: 0, spriteX: 1, spriteY: 1, slot: 'side-table', left: 0, top: 0, width: 12, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-wall-shelf', name: '벽 선반', description: '작은 소품을 위한 무대', category: 'retro', price: 0, spriteX: 2, spriteY: 1, slot: 'wall-shelf', left: 0, top: 0, width: 21, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'furniture-plant', name: '큰 화분', description: '물 주는 날은 늘 내일', category: 'retro', price: 0, spriteX: 3, spriteY: 1, slot: 'plant', left: 0, top: 0, width: 11, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
-  { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, slot: 'media-screen', left: 5, top: 48, width: 23 },
-  { id: 'console', name: '게임기', description: '할 게임은 많은데 시간은 없음', category: 'appliance', price: 220, spriteX: 1, spriteY: 0, slot: 'media-console', left: 10, top: 72, width: 10 },
-  { id: 'air-conditioner', name: '에어컨', description: '강아지 털도 여름은 덥습니다', category: 'appliance', price: 260, spriteX: 2, spriteY: 0, slot: 'upper-wall', left: 38, top: 7, width: 20 },
-  { id: 'air-purifier', name: '공기청정기', description: '털은 못 잡아도 기분은 상쾌', category: 'appliance', price: 160, spriteX: 3, spriteY: 0, slot: 'right-appliance', left: 85, top: 64, width: 8 },
-  { id: 'air-fryer', name: '에어프라이어', description: '냉동 감자의 최종 목적지', category: 'appliance', price: 140, spriteX: 0, spriteY: 1, slot: 'right-appliance', left: 84, top: 63, width: 9 },
-  { id: 'christmas-tree', name: '미니 트리', description: '방 한쪽만 갑자기 연말', category: 'christmas', price: 200, spriteX: 1, spriteY: 1, slot: 'right-corner', left: 83, top: 36, width: 12 },
-  { id: 'string-lights', name: '전구 가랜드', description: '전기세보다 분위기가 먼저', category: 'christmas', price: 110, spriteX: 2, spriteY: 1, slot: 'upper-wall', left: 32, top: 7, width: 35 },
-  { id: 'gift-boxes', name: '선물상자', description: '내용물은 아직 비밀', category: 'christmas', price: 90, spriteX: 3, spriteY: 1, slot: 'floor-left', left: 4, top: 74, width: 12 },
-  { id: 'picnic-basket', name: '피크닉 바구니', description: '날씨 좋은 날 들고 나가기', category: 'picnic', price: 130, spriteX: 0, spriteY: 2, slot: 'floor-left', left: 4, top: 72, width: 13 },
-  { id: 'picnic-mat', name: '체크 돗자리', description: '펴면 어디든 한강 느낌', category: 'picnic', price: 100, spriteX: 1, spriteY: 2, slot: 'floor-center', left: 38, top: 78, width: 20 },
-  { id: 'camp-lantern', name: '캠핑 랜턴', description: '방 안인데 괜히 캠핑 기분', category: 'picnic', price: 120, spriteX: 2, spriteY: 2, slot: 'tabletop', left: 69, top: 58, width: 8 },
-  { id: 'floor-lamp', name: '플로어 조명', description: '천장등 끄면 감성 두 배', category: 'lighting', price: 150, spriteX: 3, spriteY: 2, slot: 'right-corner', left: 86, top: 38, width: 7 },
-  { id: 'mood-light', name: '버섯 무드등', description: '쓸모보다 귀여움이 중요', category: 'lighting', price: 100, spriteX: 0, spriteY: 3, slot: 'tabletop', left: 70, top: 59, width: 6 },
-  { id: 'wall-clock', name: '레트로 벽시계', description: '시간은 가고 월급날은 안 옴', category: 'retro', price: 120, spriteX: 1, spriteY: 3, slot: 'wall-accent', left: 69, top: 14, width: 8 },
-  { id: 'retro-radio', name: '빈티지 라디오', description: '주파수보다 분위기 수신 중', category: 'retro', price: 140, spriteX: 2, spriteY: 3, slot: 'tabletop', left: 68, top: 58, width: 9 },
-  { id: 'turntable', name: '턴테이블', description: '한 면 듣고 뒤집는 부지런함', category: 'retro', price: 190, spriteX: 3, spriteY: 3, slot: 'tabletop', left: 68, top: 57, width: 10 },
-]
-const starterFurnitureIds = decorations.filter(item => item.price === 0).map(item => item.id)
-const foodProps = [
-  '/assets/props/food/delivery-clutter.png',
-  '/assets/props/food/food-chicken.png',
-  '/assets/props/food/food-cafe.png',
-  '/assets/props/food/food-late-night.png',
-] as const
 const dialogue = {
   relaxed: ['왜 불렀어? 아직은 평화로운데.', '잔액 좋고, 창밖 좋고. 오늘은 합격.', '아무것도 안 사는 것도 능력이다.', '지금의 나를 기억해 둬. 곧 표정 바뀔 수도 있어.'],
   watching: ['슬슬 영수증이 말을 걸기 시작했어.', '그 결제, 미래의 네가 허락한 거 맞아?', '아직 괜찮아. 아직은.', '장바구니는 비웠는데 왜 잔액도 비었지?'],
@@ -167,7 +56,13 @@ export default function App() {
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
   const [decorationInventory, setDecorationInventory] = useState<string[]>(() => [...new Set([...load<string[]>('pocket-decoration-inventory', []), ...starterFurnitureIds])])
-  const [equippedDecorations, setEquippedDecorations] = useState<string[]>(() => load('pocket-equipped-decorations', []))
+  const [roomLayouts, setRoomLayouts] = useState<Record<SkinId,string[]>>(() => {
+    const legacy = load<string[]>('pocket-equipped-decorations', [])
+    const saved = load<Partial<Record<SkinId,string[]>>>('pocket-flat-layouts-v1', {})
+    return Object.fromEntries((['attic','cloud','game'] as const).map(skin => [skin, normalizeItems(saved[skin] ?? [...defaultRoomSets[skin], ...legacy])])) as Record<SkinId,string[]>
+  })
+  const equippedDecorations = roomLayouts[equippedSkin]
+  const setEquippedDecorations = (update:(current:string[])=>string[]) => setRoomLayouts(current=>({...current,[equippedSkin]:normalizeItems(update(current[equippedSkin]))}))
   const [decorationZone, setDecorationZone] = useState<DecorationZone>('media')
   const [shopTab, setShopTab] = useState<'room' | 'store' | 'inventory'>('room')
   const [timePhase, setTimePhase] = useState<TimePhase>(() => load('pocket-time-phase', 'auto'))
@@ -180,51 +75,38 @@ export default function App() {
   const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
-  const foodExpenses = expenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
+  const currentMonthExpenses = expenses.filter(x => { const d = new Date(x.spentAt); const now = new Date(); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() })
+  const foodExpenses = currentMonthExpenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).sort((a,b)=>a.spentAt.localeCompare(b.spentAt))
   const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
   const foodExpenseCount = foodExpenses.length
-  const shoppingCount = expenses.filter(x => x.category === 'shopping').length
+  const shoppingCount = currentMonthExpenses.filter(x => x.category === 'shopping').length
   const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
   const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
   const deliveryPiles = Array.from({ length: deliveryPileCount }, (_, index) => {
     const seedExpense = foodExpenses[index * 3 + 2] ?? foodExpenses[index * 3]
-    return foodProps[stableIndex(seedExpense?.id ?? String(index), foodProps.length)]
+    const variants = ['food-cup','food-pizza','food-bowl','food-lunch']
+    return variants[stableIndex(seedExpense?.id ?? String(index), variants.length)]
   })
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
-  const equippedRoom = roomSkins.find(skin => skin.id === equippedSkin) ?? roomSkins[0]
-  const roomImage = equippedSkin === 'attic' ? roomImages[snapshot.stage] : equippedRoom.image
-  const dogImage = foodLevel === 2
-    ? '/assets/characters/states/dog-very-chubby.png'
-    : foodLevel === 1
-      ? '/assets/characters/states/dog-chubby.png'
-      : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
-        ? '/assets/characters/states/dog-receipt.png'
-        : '/assets/characters/states/dog-neutral.png'
-  const placedDecorations = useMemo(() => {
-    const bySlot = new Map<DecorationSlot, Decoration>()
-    equippedDecorations.forEach(id => {
-      const item = decorations.find(decoration => decoration.id === id)
-      if (item) bySlot.set(item.slot, item)
-    })
-    return [...bySlot.values()]
-  }, [equippedDecorations])
-  const displayedDecorations = useMemo(() => {
-    const equippedSlots = new Set(placedDecorations.map(item => item.slot))
-    const defaults = defaultRoomSets[equippedSkin]
-      .map(id => decorations.find(item => item.id === id))
-      .filter((item): item is Decoration => Boolean(item) && !equippedSlots.has(item!.slot))
-    return [...defaults, ...placedDecorations]
-  }, [equippedSkin, placedDecorations])
+  const placedDecorations = useMemo(() => equippedDecorations.map(id=>decorations.find(item=>item.id===id)).filter((item):item is Decoration=>Boolean(item)), [equippedDecorations])
+  const [clockHour, setClockHour] = useState(() => new Date().getHours())
   const resolvedTimePhase = useMemo(() => {
     if (timePhase !== 'auto') return timePhase
-    const hour = new Date().getHours()
-    if (hour >= 7 && hour < 17) return 'day'
-    if (hour >= 17 && hour < 20) return 'sunset'
+    if (clockHour >= 7 && clockHour < 17) return 'day'
+    if (clockHour >= 17 && clockHour < 20) return 'sunset'
     return 'night'
-  }, [timePhase])
+  }, [timePhase, clockHour])
+
+  // 화면보호기처럼 auto 모드에서 시간이 지나면 창밖이 바뀌도록 1분마다 갱신합니다.
+  useEffect(() => {
+    const tick = () => setClockHour(new Date().getHours())
+    tick()
+    const timer = window.setInterval(tick, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
@@ -232,7 +114,7 @@ export default function App() {
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
   useEffect(() => localStorage.setItem('pocket-decoration-inventory', JSON.stringify(decorationInventory)), [decorationInventory])
-  useEffect(() => localStorage.setItem('pocket-equipped-decorations', JSON.stringify(equippedDecorations)), [equippedDecorations])
+  useEffect(() => localStorage.setItem('pocket-flat-layouts-v1', JSON.stringify(roomLayouts)), [roomLayouts])
   useEffect(() => localStorage.setItem('pocket-time-phase', JSON.stringify(timePhase)), [timePhase])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
@@ -324,13 +206,14 @@ export default function App() {
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
   const useDecoration = (item: Decoration) => {
+    const supports = item.slot === 'screen' || item.slot === 'console' ? ['furniture-tv-unit'] : item.slot === 'tabletop' ? ['furniture-side-table'] : []
     const slotItemIds = new Set(decorations.filter(candidate => candidate.slot === item.slot).map(candidate => candidate.id))
     const previous = placedDecorations.find(candidate => candidate.slot === item.slot && candidate.id !== item.id)
     if (!decorationInventory.includes(item.id)) {
       if (points < item.price) { setMessage(`뼈다귀가 ${item.price - points}개 부족해요.`); return }
       setPoints(current => current - item.price)
       setDecorationInventory(current => [...current, item.id])
-      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), item.id])
+      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), ...supports, item.id])
       setMessage(previous ? `${item.name}을 놓고 ${previous.name}은 소지품에 넣었어요.` : `${item.name}을 구입하고 방에 놓았어요.`)
       return
     }
@@ -338,7 +221,7 @@ export default function App() {
       setEquippedDecorations(current => current.filter(id => id !== item.id))
       setMessage(`${item.name}을 소지품에 넣었어요.`)
     } else {
-      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), item.id])
+      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), ...supports, item.id])
       setMessage(previous ? `${previous.name} 대신 ${item.name}을 놓았어요.` : `${item.name}을 방에 다시 놓았어요.`)
     }
   }
@@ -351,23 +234,9 @@ export default function App() {
   return <main className="app-shell">
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
-    <section className={`attic stage-${snapshot.stage} time-${resolvedTimePhase} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`} style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties} aria-label="강아지의 방">
-      <img className="room-art" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
-      {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
-      <div className="prop-layer" aria-hidden="true">
-        {deliveryPiles.map((source, index) => <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />)}
-        {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
-      </div>
-      <div className="decoration-layer" aria-hidden="true">
-        {displayedDecorations.map(item => { const placement = roomPlacements[equippedSkin][item.slot]; const scale = item.width / ({ 'media-screen': 23, 'media-console': 10, 'upper-wall': 20, 'right-appliance': 9, 'right-corner': 10, 'floor-left': 13, 'floor-center': 20, tabletop: 8, 'wall-accent': 8, bed: 36, storage: 20, 'main-rug': 42, seating: 38, 'media-unit': 29, 'side-table': 12, 'wall-shelf': 21, plant: 11 } as Record<DecorationSlot, number>)[item.slot]; return <span className="placed-decoration" key={`${equippedSkin}-${item.id}`} style={{ backgroundImage: `url(${item.asset ?? '/assets/decorations/room-items-sprite.png'})`, '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--sprite-columns': item.columns ?? 4, '--sprite-rows': item.rows ?? 4, '--sprite-x-divisor': (item.columns ?? 4) - 1, '--sprite-y-divisor': (item.rows ?? 4) - 1, '--item-left': `${placement.left}%`, '--item-top': `${placement.top}%`, '--item-width': `${placement.width * scale}%` } as CSSProperties} /> })}
-      </div>
-      <div className="time-switch" aria-label="방 시간대"><button className={timePhase === 'auto' ? 'active' : ''} onClick={() => setTimePhase('auto')}>자동</button><button className={timePhase === 'day' ? 'active' : ''} onClick={() => setTimePhase('day')}>낮</button><button className={timePhase === 'sunset' ? 'active' : ''} onClick={() => setTimePhase('sunset')}>노을</button><button className={timePhase === 'night' ? 'active' : ''} onClick={() => setTimePhase('night')}>밤</button></div>
-      <div className="dog-wrap">
-        {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
-        <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기"><img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} /></button>
-        {!bubbleVisible && <span className="talk-hint">강아지를 눌러보세요</span>}
-      </div>
-    </section>
+    <FlatRoom skin={equippedSkin} phase={resolvedTimePhase} selectedPhase={timePhase} onPhase={setTimePhase}
+      items={placedDecorations} food={deliveryPiles} parcels={parcelPileCount} remaining={snapshot.remainingRatio} foodLevel={foodLevel}
+      bubble={bubbleVisible} line={dogLine || line} onTalk={talkToDog} onClose={()=>setBubbleVisible(false)} />
 
     <section className="summary-grid">
       <article><span>월급</span><strong>{won(plan.monthlyIncome)}원</strong></article>
@@ -447,14 +316,14 @@ export default function App() {
       <div className="shop-tab-switch"><button className={shopTab === 'room' ? 'active' : ''} onClick={() => setShopTab('room')}>방 스킨</button><button className={shopTab === 'store' ? 'active' : ''} onClick={() => setShopTab('store')}>소품 상점</button><button className={shopTab === 'inventory' ? 'active' : ''} onClick={() => setShopTab('inventory')}>내 아이템</button></div>
       {shopTab === 'room' ? <><div className="shop-section-title"><div><span>ROOM</span><h3>방 스킨</h3></div><small>한 번에 하나 사용</small></div>
       <div className="skin-grid">{roomSkins.map(skin => { const owned = inventory.includes(skin.id); const equipped = equippedSkin === skin.id; return <article key={skin.id} className={equipped ? 'equipped' : ''}>
-        <img src={skin.image} alt={`${skin.name} 미리보기`} />
+        <FlatRoom skin={skin.id} phase="day" selectedPhase="day" onPhase={()=>{}} items={defaultRoomSets[skin.id].map(id=>decorations.find(item=>item.id===id)!)} food={[]} parcels={0} remaining={1} foodLevel={0} bubble={false} line="" onTalk={()=>{}} onClose={()=>{}} miniature />
         <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
         <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
       </article> })}</div></> : <><div className="shop-section-title decoration-heading"><div><span>{shopTab === 'store' ? 'STORE' : 'MY ITEMS'}</span><h3>{shopTab === 'store' ? '소품 상점' : '내 아이템'}</h3></div><small>{shopTab === 'store' ? `${decorations.length - decorationInventory.length}개 구매 가능` : `${decorationInventory.length}개 보유`}</small></div>
       <div className="decoration-filters zone-filters">{decorationZones.map(zone => <button className={decorationZone === zone.value ? 'active' : ''} onClick={() => setDecorationZone(zone.value)} key={zone.value}><span>{zone.emoji}</span>{zone.label}</button>)}</div>
       <div className="zone-guide"><b>{decorationZones.find(zone => zone.value === decorationZone)?.label}</b><span>이 구역의 자리는 서로 겹치지 않게 고정됩니다.</span></div>
       <div className="decoration-grid">{decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).map(item => { const owned = decorationInventory.includes(item.id); const equipped = placedDecorations.some(placed => placed.id === item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
-        <div className="decoration-preview"><span style={{ backgroundImage: `url(${item.asset ?? '/assets/decorations/room-items-sprite.png'})`, '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--sprite-columns': item.columns ?? 4, '--sprite-rows': item.rows ?? 4, '--sprite-x-divisor': (item.columns ?? 4) - 1, '--sprite-y-divisor': (item.rows ?? 4) - 1 } as CSSProperties} /></div>
+        <div className="flat-item-preview"><FlatArt id={item.id}/></div>
         <div className="decoration-copy"><h3>{item.name}</h3><span className="slot-label">⌖ {decorationSlots[item.slot]}</span><p>{item.description}</p></div>
         <button onClick={() => useDecoration(item)}>{!owned ? `🦴 ${item.price}개` : equipped ? '방에서 치우기' : '방에 놓기'}</button>
       </article> })}</div>

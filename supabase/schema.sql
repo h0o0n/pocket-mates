@@ -301,9 +301,9 @@ alter table public.shop_items add column if not exists slot text;
 
 insert into public.shop_items (id, item_type, name, description, price, asset_path)
 values
-  ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/rooms/budget-states/attic-cozy.png'),
-  ('cloud', 'room_skin', '새벽 구름방', '구름 위로 아침이 오는 방', 250, '/assets/rooms/skins/cloud-dawn.png'),
-  ('game', 'room_skin', '주말 게임방', '잔액보다 세이브 파일이 중요한 방', 400, '/assets/rooms/skins/weekend-game.png')
+  ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/flat/room-attic.svg'),
+  ('cloud', 'room_skin', '새벽 구름방', '구름 위로 아침이 오는 방', 250, '/assets/flat/room-cloud.svg'),
+  ('game', 'room_skin', '주말 게임방', '잔액보다 세이브 파일이 중요한 방', 400, '/assets/flat/room-game.svg')
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
@@ -312,22 +312,22 @@ on conflict (id) do update set
 
 insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement)
 values
-  ('tv', 'decoration', 'appliance', '작은 TV', '주말을 순식간에 없애는 화면', 180, '/assets/decorations/room-items-sprite.png', 0, 0, '{"left":6,"top":51,"width":25}'),
-  ('console', 'decoration', 'appliance', '게임기', '할 게임은 많은데 시간은 없음', 220, '/assets/decorations/room-items-sprite.png', 1, 0, '{"left":20,"top":69,"width":16}'),
-  ('air-conditioner', 'decoration', 'appliance', '에어컨', '강아지 털도 여름은 덥습니다', 260, '/assets/decorations/room-items-sprite.png', 2, 0, '{"left":37,"top":7,"width":22}'),
-  ('air-purifier', 'decoration', 'appliance', '공기청정기', '털은 못 잡아도 기분은 상쾌', 160, '/assets/decorations/room-items-sprite.png', 3, 0, '{"left":86,"top":54,"width":10}'),
-  ('air-fryer', 'decoration', 'appliance', '에어프라이어', '냉동 감자의 최종 목적지', 140, '/assets/decorations/room-items-sprite.png', 0, 1, '{"left":74,"top":62,"width":11}'),
-  ('christmas-tree', 'decoration', 'christmas', '미니 트리', '방 한쪽만 갑자기 연말', 200, '/assets/decorations/room-items-sprite.png', 1, 1, '{"left":79,"top":34,"width":18}'),
-  ('string-lights', 'decoration', 'christmas', '전구 가랜드', '전기세보다 분위기가 먼저', 110, '/assets/decorations/room-items-sprite.png', 2, 1, '{"left":32,"top":7,"width":35}'),
-  ('gift-boxes', 'decoration', 'christmas', '선물상자', '내용물은 아직 비밀', 90, '/assets/decorations/room-items-sprite.png', 3, 1, '{"left":66,"top":70,"width":15}'),
-  ('picnic-basket', 'decoration', 'picnic', '피크닉 바구니', '날씨 좋은 날 들고 나가기', 130, '/assets/decorations/room-items-sprite.png', 0, 2, '{"left":6,"top":67,"width":17}'),
-  ('picnic-mat', 'decoration', 'picnic', '체크 돗자리', '펴면 어디든 한강 느낌', 100, '/assets/decorations/room-items-sprite.png', 1, 2, '{"left":34,"top":75,"width":26}'),
-  ('camp-lantern', 'decoration', 'picnic', '캠핑 랜턴', '방 안인데 괜히 캠핑 기분', 120, '/assets/decorations/room-items-sprite.png', 2, 2, '{"left":68,"top":55,"width":10}'),
-  ('floor-lamp', 'decoration', 'lighting', '플로어 조명', '천장등 끄면 감성 두 배', 150, '/assets/decorations/room-items-sprite.png', 3, 2, '{"left":88,"top":36,"width":9}'),
-  ('mood-light', 'decoration', 'lighting', '버섯 무드등', '쓸모보다 귀여움이 중요', 100, '/assets/decorations/room-items-sprite.png', 0, 3, '{"left":58,"top":69,"width":8}'),
-  ('wall-clock', 'decoration', 'retro', '레트로 벽시계', '시간은 가고 월급날은 안 옴', 120, '/assets/decorations/room-items-sprite.png', 1, 3, '{"left":69,"top":13,"width":9}'),
-  ('retro-radio', 'decoration', 'retro', '빈티지 라디오', '주파수보다 분위기 수신 중', 140, '/assets/decorations/room-items-sprite.png', 2, 3, '{"left":75,"top":57,"width":12}'),
-  ('turntable', 'decoration', 'retro', '턴테이블', '한 면 듣고 뒤집는 부지런함', 190, '/assets/decorations/room-items-sprite.png', 3, 3, '{"left":39,"top":62,"width":15}')
+  ('tv', 'decoration', 'appliance', '작은 TV', '주말을 순식간에 없애는 화면', 180, '/assets/flat/items/tv.svg', 0, 0, '{"left":6,"top":51,"width":25}'),
+  ('console', 'decoration', 'appliance', '게임기', '할 게임은 많은데 시간은 없음', 220, '/assets/flat/items/console.svg', 1, 0, '{"left":20,"top":69,"width":16}'),
+  ('air-conditioner', 'decoration', 'appliance', '에어컨', '강아지 털도 여름은 덥습니다', 260, '/assets/flat/items/air-conditioner.svg', 2, 0, '{"left":37,"top":7,"width":22}'),
+  ('air-purifier', 'decoration', 'appliance', '공기청정기', '털은 못 잡아도 기분은 상쾌', 160, '/assets/flat/items/air-purifier.svg', 3, 0, '{"left":86,"top":54,"width":10}'),
+  ('air-fryer', 'decoration', 'appliance', '에어프라이어', '냉동 감자의 최종 목적지', 140, '/assets/flat/items/air-fryer.svg', 0, 1, '{"left":74,"top":62,"width":11}'),
+  ('christmas-tree', 'decoration', 'christmas', '미니 트리', '방 한쪽만 갑자기 연말', 200, '/assets/flat/items/christmas-tree.svg', 1, 1, '{"left":79,"top":34,"width":18}'),
+  ('string-lights', 'decoration', 'christmas', '전구 가랜드', '전기세보다 분위기가 먼저', 110, '/assets/flat/items/string-lights.svg', 2, 1, '{"left":32,"top":7,"width":35}'),
+  ('gift-boxes', 'decoration', 'christmas', '선물상자', '내용물은 아직 비밀', 90, '/assets/flat/items/gift-boxes.svg', 3, 1, '{"left":66,"top":70,"width":15}'),
+  ('picnic-basket', 'decoration', 'picnic', '피크닉 바구니', '날씨 좋은 날 들고 나가기', 130, '/assets/flat/items/picnic-basket.svg', 0, 2, '{"left":6,"top":67,"width":17}'),
+  ('picnic-mat', 'decoration', 'picnic', '체크 돗자리', '펴면 어디든 한강 느낌', 100, '/assets/flat/items/picnic-mat.svg', 1, 2, '{"left":34,"top":75,"width":26}'),
+  ('camp-lantern', 'decoration', 'picnic', '캠핑 랜턴', '방 안인데 괜히 캠핑 기분', 120, '/assets/flat/items/camp-lantern.svg', 2, 2, '{"left":68,"top":55,"width":10}'),
+  ('floor-lamp', 'decoration', 'lighting', '플로어 조명', '천장등 끄면 감성 두 배', 150, '/assets/flat/items/floor-lamp.svg', 3, 2, '{"left":88,"top":36,"width":9}'),
+  ('mood-light', 'decoration', 'lighting', '버섯 무드등', '쓸모보다 귀여움이 중요', 100, '/assets/flat/items/mood-light.svg', 0, 3, '{"left":58,"top":69,"width":8}'),
+  ('wall-clock', 'decoration', 'retro', '레트로 벽시계', '시간은 가고 월급날은 안 옴', 120, '/assets/flat/items/wall-clock.svg', 1, 3, '{"left":69,"top":13,"width":9}'),
+  ('retro-radio', 'decoration', 'retro', '빈티지 라디오', '주파수보다 분위기 수신 중', 140, '/assets/flat/items/retro-radio.svg', 2, 3, '{"left":75,"top":57,"width":12}'),
+  ('turntable', 'decoration', 'retro', '턴테이블', '한 면 듣고 뒤집는 부지런함', 190, '/assets/flat/items/turntable.svg', 3, 3, '{"left":39,"top":62,"width":15}')
 on conflict (id) do update set
   category = excluded.category, name = excluded.name, description = excluded.description,
   price = excluded.price, asset_path = excluded.asset_path, sprite_column = excluded.sprite_column,
@@ -348,14 +348,14 @@ where item_type = 'decoration';
 
 insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement, slot)
 values
-  ('furniture-bed', 'decoration', 'retro', '포근한 침대', '방의 절반을 차지하는 행복', 0, '/assets/decorations/furniture-sprite.png', 0, 0, '{}', 'seating'),
-  ('furniture-bookcase', 'decoration', 'retro', '원목 책장', '읽은 책보다 장식이 더 많음', 0, '/assets/decorations/furniture-sprite.png', 1, 0, '{}', 'storage'),
-  ('furniture-rug', 'decoration', 'retro', '타원 러그', '강아지가 제일 먼저 차지함', 0, '/assets/decorations/furniture-sprite.png', 2, 0, '{}', 'main-rug'),
-  ('furniture-sofa', 'decoration', 'retro', '남색 소파', '게임 켜고 그대로 잠드는 자리', 0, '/assets/decorations/furniture-sprite.png', 3, 0, '{}', 'seating'),
-  ('furniture-tv-unit', 'decoration', 'retro', '원목 TV장', '게임기들이 모이는 본진', 0, '/assets/decorations/furniture-sprite.png', 0, 1, '{}', 'storage'),
-  ('furniture-side-table', 'decoration', 'retro', '둥근 협탁', '컵 하나 올리면 꽉 참', 0, '/assets/decorations/furniture-sprite.png', 1, 1, '{}', 'side-table'),
-  ('furniture-wall-shelf', 'decoration', 'retro', '벽 선반', '작은 소품을 위한 무대', 0, '/assets/decorations/furniture-sprite.png', 2, 1, '{}', 'wall-shelf'),
-  ('furniture-plant', 'decoration', 'retro', '큰 화분', '물 주는 날은 늘 내일', 0, '/assets/decorations/furniture-sprite.png', 3, 1, '{}', 'plant')
+  ('furniture-bed', 'decoration', 'retro', '포근한 침대', '방의 절반을 차지하는 행복', 0, '/assets/flat/items/furniture-bed.svg', 0, 0, '{}', 'seating'),
+  ('furniture-bookcase', 'decoration', 'retro', '원목 책장', '읽은 책보다 장식이 더 많음', 0, '/assets/flat/items/furniture-bookcase.svg', 1, 0, '{}', 'storage'),
+  ('furniture-rug', 'decoration', 'retro', '타원 러그', '강아지가 제일 먼저 차지함', 0, '/assets/flat/items/furniture-rug.svg', 2, 0, '{}', 'main-rug'),
+  ('furniture-sofa', 'decoration', 'retro', '남색 소파', '게임 켜고 그대로 잠드는 자리', 0, '/assets/flat/items/furniture-sofa.svg', 3, 0, '{}', 'seating'),
+  ('furniture-tv-unit', 'decoration', 'retro', '원목 TV장', '게임기들이 모이는 본진', 0, '/assets/flat/items/furniture-tv-unit.svg', 0, 1, '{}', 'storage'),
+  ('furniture-side-table', 'decoration', 'retro', '둥근 협탁', '컵 하나 올리면 꽉 참', 0, '/assets/flat/items/furniture-side-table.svg', 1, 1, '{}', 'side-table'),
+  ('furniture-wall-shelf', 'decoration', 'retro', '벽 선반', '작은 소품을 위한 무대', 0, '/assets/flat/items/furniture-wall-shelf.svg', 2, 1, '{}', 'wall-shelf'),
+  ('furniture-plant', 'decoration', 'retro', '큰 화분', '물 주는 날은 늘 내일', 0, '/assets/flat/items/furniture-plant.svg', 3, 1, '{}', 'plant')
 on conflict (id) do update set
   name = excluded.name, description = excluded.description, price = excluded.price,
   asset_path = excluded.asset_path, sprite_column = excluded.sprite_column,
@@ -485,3 +485,35 @@ create policy "daily_missions_update_own"
   on public.daily_mission_progress for update to authenticated
   using ((select auth.uid()) is not null and (select auth.uid()) = user_id)
   with check ((select auth.uid()) is not null and (select auth.uid()) = user_id);
+
+
+-- Flat room v2: assets are standalone SVGs, slots share the 1000x650 scene coordinates.
+alter table public.companion_states add column if not exists room_layouts jsonb not null default '{}'::jsonb;
+update public.shop_items set sprite_column = null, sprite_row = null, placement = '{}'::jsonb,
+ slot = case id
+ when 'furniture-bed' then 'seat'
+ when 'furniture-sofa' then 'seat'
+ when 'furniture-bookcase' then 'cabinet'
+ when 'furniture-tv-unit' then 'cabinet'
+ when 'furniture-rug' then 'rug'
+ when 'picnic-mat' then 'rug'
+ when 'furniture-side-table' then 'table'
+ when 'furniture-wall-shelf' then 'shelf'
+ when 'furniture-plant' then 'plant'
+ when 'tv' then 'screen'
+ when 'console' then 'console'
+ when 'air-conditioner' then 'wall'
+ when 'string-lights' then 'wall'
+ when 'air-purifier' then 'appliance'
+ when 'air-fryer' then 'appliance'
+ when 'christmas-tree' then 'lamp'
+ when 'floor-lamp' then 'lamp'
+ when 'gift-boxes' then 'basket'
+ when 'picnic-basket' then 'basket'
+ when 'camp-lantern' then 'tabletop'
+ when 'mood-light' then 'tabletop'
+ when 'wall-clock' then 'clock'
+ when 'retro-radio' then 'tabletop'
+ when 'turntable' then 'tabletop'
+ else slot end
+where item_type = 'decoration';

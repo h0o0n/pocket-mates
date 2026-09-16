@@ -51,3 +51,59 @@ images/blog/
 - `rooms/empty-cloud-sunset.png`: 고정 가구가 없는 구름 노을방
 - `rooms/empty-game-night.png`: 고정 가구가 없는 게임방 구조
 - `decorations/furniture-sprite.png`: 침대, 책장, 러그, 소파, TV장, 협탁, 벽 선반, 화분 4×2 스프라이트
+- `decorations/room-items-sprite.png`: 상점 소품 4×4 스프라이트
+
+## 창밖 시간대 레이어 (Lofi)
+
+방 전체 톤 필터만으로는 창밖이 바뀌는 느낌이 약해서, **창문 사각형 위에 sky 레이어**를 얹습니다.
+
+```text
+web/public/assets/rooms/windows/
+├─ sky-day.png      # 맑은 낮 하늘 / 먼 건물 실루엣
+├─ sky-sunset.png   # 노을·보라-주황 그라데이션
+└─ sky-night.png    # 밤하늘·희미한 도시 불빛
+```
+
+### 제작 규칙
+
+1. 캔버스 **16:9**, 해상도 권장 1280×720 이상
+2. **창문 유리 영역만** 그리거나, 전체 하늘 텍스처로 두고 앱이 `windowFrames`로 크롭
+3. 방 이미지와 **같은 카메라 높이·소실점**을 유지
+4. 이상적으로는 빈 방 PNG의 창문을 **어두운 단색/투명에 가깝게** 다시 뽑아, sky가 자연스럽게 비치게 함
+5. 파일이 없어도 CSS 그라데이션 폴백이 동작함
+
+앱의 창문 좌표는 `web/src/App.tsx`의 `windowFrames`입니다. 스킨마다 창 위치가 다르면 여기 %만 조정합니다.
+
+## 소품이 방과 안 어울릴 때 (크기·각도)
+
+### 원인
+
+1. 방은 **투시(원근)** 그림인데, 소품은 **정면 컷아웃**으로 따로 생성됨
+2. CSS가 소품 칸을 `aspect-ratio: 1` 정사각으로 강제해 침대·러그가 찌그러짐
+3. 모든 소품이 같은 스케일이라 **앞쪽/뒤쪽 깊이감**이 없음
+4. 조명·선 굵기·채도가 방 원본과 다름
+
+### 해결 순서 (효과가 큰 순)
+
+1. **에셋 재생성 (근본)**
+   - 프롬프트에 방과 동일 조건 명시: `same perspective as attic room, front-facing eye-level view, warm pencil/watercolor, matching line weight`
+   - 가능하면 **방 스킨별로 소품 시트**를 분리
+2. **코드 자동 보정 (현재 반영)**
+   - 방 이미지를 기준으로 `windowFrames`·`roomPlacements`·슬롯 크기를 정면 시점에 맞게 재조정
+   - 스프라이트 칸은 정사각 유지(찌그러짐 방지), 시간대별 소품 조명 필터 적용
+   - 억지 `rotate/skew`는 제거 (방이 정면인데 기울이면 더 어색해짐)
+3. **기본 가구 bake (장기)**
+   - 자주 쓰는 침대/러그는 방 이미지에 포함하고, 상점은 악세서리 위주
+
+### 이미지 AI 프롬프트 템플릿
+
+```text
+Isometric-ish cozy attic interior prop, isolated on transparent background,
+matching the perspective of a hand-drawn Korean webtoon room (slight downward angle),
+warm muted palette, soft shading, no harsh drop shadow, game asset sprite
+```
+
+방 사진 한 장을 레퍼런스로 넣고 “match this room's camera angle and line weight”를 반드시 같이 넣습니다.
+# 현재 자산 (평면 방 v2)
+
+현재 앱은 `web/src/room/FlatArt.tsx`의 SVG 소품과 `web/public/assets/flat/`만 사용합니다. 아래의 과거 PNG 목록은 이전 버전 기록이며, 폐기 자산은 로컬 `output/flat-room/legacy-assets-before-flat.zip`에 백업했습니다. 상세 관리 방법은 `FLAT_ROOM.md`를 참고하세요.
