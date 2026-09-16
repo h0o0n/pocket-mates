@@ -45,3 +45,9 @@ images/blog/
 ## 코드에서 사용하는 경로
 
 `web/public`이 웹 루트이므로 앱 코드에서는 `/assets/...`로 참조합니다. 파일을 옮기면 `web/src`의 경로도 함께 수정하고 반드시 빌드를 확인합니다.
+# 빈 방 및 가구 소품
+
+- `rooms/empty-attic-night.png`: 고정 가구가 없는 밤의 다락방
+- `rooms/empty-cloud-sunset.png`: 고정 가구가 없는 구름 노을방
+- `rooms/empty-game-night.png`: 고정 가구가 없는 게임방 구조
+- `decorations/furniture-sprite.png`: 침대, 책장, 러그, 소파, TV장, 협탁, 벽 선반, 화분 4×2 스프라이트

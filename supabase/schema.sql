@@ -346,6 +346,21 @@ update public.shop_items set slot = case id
   else slot end
 where item_type = 'decoration';
 
+insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement, slot)
+values
+  ('furniture-bed', 'decoration', 'retro', '포근한 침대', '방의 절반을 차지하는 행복', 0, '/assets/decorations/furniture-sprite.png', 0, 0, '{}', 'seating'),
+  ('furniture-bookcase', 'decoration', 'retro', '원목 책장', '읽은 책보다 장식이 더 많음', 0, '/assets/decorations/furniture-sprite.png', 1, 0, '{}', 'storage'),
+  ('furniture-rug', 'decoration', 'retro', '타원 러그', '강아지가 제일 먼저 차지함', 0, '/assets/decorations/furniture-sprite.png', 2, 0, '{}', 'main-rug'),
+  ('furniture-sofa', 'decoration', 'retro', '남색 소파', '게임 켜고 그대로 잠드는 자리', 0, '/assets/decorations/furniture-sprite.png', 3, 0, '{}', 'seating'),
+  ('furniture-tv-unit', 'decoration', 'retro', '원목 TV장', '게임기들이 모이는 본진', 0, '/assets/decorations/furniture-sprite.png', 0, 1, '{}', 'storage'),
+  ('furniture-side-table', 'decoration', 'retro', '둥근 협탁', '컵 하나 올리면 꽉 참', 0, '/assets/decorations/furniture-sprite.png', 1, 1, '{}', 'side-table'),
+  ('furniture-wall-shelf', 'decoration', 'retro', '벽 선반', '작은 소품을 위한 무대', 0, '/assets/decorations/furniture-sprite.png', 2, 1, '{}', 'wall-shelf'),
+  ('furniture-plant', 'decoration', 'retro', '큰 화분', '물 주는 날은 늘 내일', 0, '/assets/decorations/furniture-sprite.png', 3, 1, '{}', 'plant')
+on conflict (id) do update set
+  name = excluded.name, description = excluded.description, price = excluded.price,
+  asset_path = excluded.asset_path, sprite_column = excluded.sprite_column,
+  sprite_row = excluded.sprite_row, slot = excluded.slot;
+
 update public.shop_items set placement = case id
   when 'tv' then '{"left":5,"top":48,"width":23}'::jsonb
   when 'console' then '{"left":10,"top":72,"width":10}'::jsonb

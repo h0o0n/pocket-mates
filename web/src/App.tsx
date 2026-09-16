@@ -18,28 +18,30 @@ const copy = {
   speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
 const roomImages = {
-  relaxed: '/assets/rooms/budget-states/attic-cozy.png',
-  watching: '/assets/rooms/budget-states/attic-lived-in.png',
-  calculating: '/assets/rooms/budget-states/attic-worn.png',
-  worried: '/assets/rooms/budget-states/attic-struggling.png',
-  speechless: '/assets/rooms/budget-states/attic-broke.png',
+  relaxed: '/assets/rooms/empty-attic-night.png', watching: '/assets/rooms/empty-attic-night.png',
+  calculating: '/assets/rooms/empty-attic-night.png', worried: '/assets/rooms/empty-attic-night.png',
+  speechless: '/assets/rooms/empty-attic-night.png',
 } as const
 type SkinId = 'attic' | 'cloud' | 'game'
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
-  { id: 'attic', name: '밤의 다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
-  { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
-  { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
+  { id: 'attic', name: '밤의 다락방', description: '가구 없이 시작하는 따뜻한 다락방', price: 0, image: '/assets/rooms/empty-attic-night.png' },
+  { id: 'cloud', name: '새벽 구름방', description: '노을과 구름이 보이는 빈 방', price: 250, image: '/assets/rooms/empty-cloud-sunset.png' },
+  { id: 'game', name: '주말 게임방', description: '게임방으로 꾸밀 수 있는 빈 공간', price: 400, image: '/assets/rooms/empty-game-night.png' },
 ]
 type DecorationCategory = 'appliance' | 'christmas' | 'picnic' | 'lighting' | 'retro'
-type DecorationSlot = 'media-screen' | 'media-console' | 'upper-wall' | 'right-appliance' | 'right-corner' | 'floor-left' | 'floor-center' | 'tabletop' | 'wall-accent'
+type DecorationSlot = 'media-screen' | 'media-console' | 'upper-wall' | 'right-appliance' | 'right-corner' | 'floor-left' | 'floor-center' | 'tabletop' | 'wall-accent' | 'bed' | 'storage' | 'main-rug' | 'seating' | 'media-unit' | 'side-table' | 'wall-shelf' | 'plant'
 type Decoration = {
   id: string; name: string; description: string; category: DecorationCategory; price: number
   spriteX: number; spriteY: number; slot: DecorationSlot; left: number; top: number; width: number
+  asset?: string; columns?: number; rows?: number
 }
 const decorationSlots: Record<DecorationSlot, string> = {
   'media-screen': '왼쪽 TV 자리', 'media-console': 'TV 아래', 'upper-wall': '위쪽 벽',
   'right-appliance': '오른쪽 가전 자리', 'right-corner': '오른쪽 구석', 'floor-left': '왼쪽 바닥',
   'floor-center': '가운데 바닥', tabletop: '테이블 위', 'wall-accent': '오른쪽 벽',
+  bed: '왼쪽 침실 자리', storage: '오른쪽 수납 자리', 'main-rug': '가운데 러그 자리',
+  seating: '왼쪽 휴식 자리', 'media-unit': '오른쪽 TV장 자리', 'side-table': '침대 옆',
+  'wall-shelf': '벽 선반 자리', plant: '창가 화분 자리',
 }
 type DecorationZone = 'media' | 'wall' | 'table' | 'floor' | 'right'
 type TimePhase = 'auto' | 'day' | 'sunset' | 'night'
@@ -53,6 +55,8 @@ const slotZones: Record<DecorationSlot, DecorationZone> = {
   'media-screen': 'media', 'media-console': 'media', 'upper-wall': 'wall', 'wall-accent': 'wall',
   tabletop: 'table', 'floor-left': 'floor', 'floor-center': 'floor',
   'right-appliance': 'right', 'right-corner': 'right',
+  bed: 'floor', seating: 'floor', 'main-rug': 'floor', storage: 'right', 'media-unit': 'right',
+  'side-table': 'floor', 'wall-shelf': 'wall', plant: 'right',
 }
 const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
   attic: {
@@ -61,6 +65,10 @@ const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
     tabletop: { left: 67, top: 55, width: 9 }, 'floor-left': { left: 4, top: 70, width: 14 },
     'floor-center': { left: 38, top: 77, width: 22 }, 'right-appliance': { left: 88, top: 65, width: 9 },
     'right-corner': { left: 86, top: 39, width: 10 },
+    bed: { left: 2, top: 43, width: 36 }, storage: { left: 78, top: 39, width: 20 },
+    'main-rug': { left: 31, top: 69, width: 42 }, seating: { left: 2, top: 47, width: 37 },
+    'media-unit': { left: 65, top: 58, width: 28 }, 'side-table': { left: 32, top: 54, width: 12 },
+    'wall-shelf': { left: 76, top: 25, width: 21 }, plant: { left: 73, top: 55, width: 11 },
   },
   cloud: {
     'media-screen': { left: 65, top: 49, width: 21 }, 'media-console': { left: 70, top: 71, width: 11 },
@@ -68,6 +76,10 @@ const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
     tabletop: { left: 84, top: 30, width: 8 }, 'floor-left': { left: 4, top: 72, width: 13 },
     'floor-center': { left: 39, top: 78, width: 21 }, 'right-appliance': { left: 88, top: 65, width: 8 },
     'right-corner': { left: 87, top: 44, width: 9 },
+    bed: { left: 2, top: 45, width: 36 }, storage: { left: 80, top: 40, width: 18 },
+    'main-rug': { left: 31, top: 70, width: 42 }, seating: { left: 2, top: 49, width: 37 },
+    'media-unit': { left: 66, top: 59, width: 27 }, 'side-table': { left: 32, top: 56, width: 11 },
+    'wall-shelf': { left: 78, top: 26, width: 19 }, plant: { left: 74, top: 56, width: 10 },
   },
   game: {
     'media-screen': { left: 80, top: 31, width: 18 }, 'media-console': { left: 83, top: 62, width: 10 },
@@ -75,12 +87,26 @@ const roomPlacements: Record<SkinId, Record<DecorationSlot, Placement>> = {
     tabletop: { left: 24, top: 43, width: 8 }, 'floor-left': { left: 5, top: 70, width: 13 },
     'floor-center': { left: 40, top: 78, width: 20 }, 'right-appliance': { left: 90, top: 68, width: 7 },
     'right-corner': { left: 91, top: 49, width: 7 },
+    bed: { left: 2, top: 44, width: 34 }, storage: { left: 80, top: 39, width: 18 },
+    'main-rug': { left: 31, top: 70, width: 42 }, seating: { left: 1, top: 48, width: 38 },
+    'media-unit': { left: 69, top: 57, width: 29 }, 'side-table': { left: 30, top: 55, width: 12 },
+    'wall-shelf': { left: 3, top: 19, width: 21 }, plant: { left: 74, top: 55, width: 10 },
   },
 }
 const defaultRoomSets: Record<SkinId, string[]> = {
-  attic: ['mood-light', 'wall-clock'], cloud: ['string-lights', 'picnic-basket'], game: ['console', 'retro-radio'],
+  attic: ['furniture-bed', 'furniture-bookcase', 'furniture-rug', 'furniture-side-table', 'furniture-plant', 'mood-light'],
+  cloud: ['furniture-bed', 'furniture-rug', 'furniture-side-table', 'furniture-wall-shelf', 'furniture-plant'],
+  game: ['furniture-sofa', 'furniture-tv-unit', 'furniture-rug', 'furniture-wall-shelf', 'furniture-plant', 'tv', 'console'],
 }
 const decorations: Decoration[] = [
+  { id: 'furniture-bed', name: '포근한 침대', description: '방의 절반을 차지하는 행복', category: 'retro', price: 0, spriteX: 0, spriteY: 0, slot: 'seating', left: 0, top: 0, width: 36, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-bookcase', name: '원목 책장', description: '읽은 책보다 장식이 더 많음', category: 'retro', price: 0, spriteX: 1, spriteY: 0, slot: 'storage', left: 0, top: 0, width: 20, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-rug', name: '타원 러그', description: '강아지가 제일 먼저 차지함', category: 'retro', price: 0, spriteX: 2, spriteY: 0, slot: 'main-rug', left: 0, top: 0, width: 42, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-sofa', name: '남색 소파', description: '게임 켜고 그대로 잠드는 자리', category: 'retro', price: 0, spriteX: 3, spriteY: 0, slot: 'seating', left: 0, top: 0, width: 38, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-tv-unit', name: '원목 TV장', description: '게임기들이 모이는 본진', category: 'retro', price: 0, spriteX: 0, spriteY: 1, slot: 'storage', left: 0, top: 0, width: 20, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-side-table', name: '둥근 협탁', description: '컵 하나 올리면 꽉 참', category: 'retro', price: 0, spriteX: 1, spriteY: 1, slot: 'side-table', left: 0, top: 0, width: 12, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-wall-shelf', name: '벽 선반', description: '작은 소품을 위한 무대', category: 'retro', price: 0, spriteX: 2, spriteY: 1, slot: 'wall-shelf', left: 0, top: 0, width: 21, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
+  { id: 'furniture-plant', name: '큰 화분', description: '물 주는 날은 늘 내일', category: 'retro', price: 0, spriteX: 3, spriteY: 1, slot: 'plant', left: 0, top: 0, width: 11, asset: '/assets/decorations/furniture-sprite.png', columns: 4, rows: 2 },
   { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, slot: 'media-screen', left: 5, top: 48, width: 23 },
   { id: 'console', name: '게임기', description: '할 게임은 많은데 시간은 없음', category: 'appliance', price: 220, spriteX: 1, spriteY: 0, slot: 'media-console', left: 10, top: 72, width: 10 },
   { id: 'air-conditioner', name: '에어컨', description: '강아지 털도 여름은 덥습니다', category: 'appliance', price: 260, spriteX: 2, spriteY: 0, slot: 'upper-wall', left: 38, top: 7, width: 20 },
@@ -98,6 +124,7 @@ const decorations: Decoration[] = [
   { id: 'retro-radio', name: '빈티지 라디오', description: '주파수보다 분위기 수신 중', category: 'retro', price: 140, spriteX: 2, spriteY: 3, slot: 'tabletop', left: 68, top: 58, width: 9 },
   { id: 'turntable', name: '턴테이블', description: '한 면 듣고 뒤집는 부지런함', category: 'retro', price: 190, spriteX: 3, spriteY: 3, slot: 'tabletop', left: 68, top: 57, width: 10 },
 ]
+const starterFurnitureIds = decorations.filter(item => item.price === 0).map(item => item.id)
 const foodProps = [
   '/assets/props/food/delivery-clutter.png',
   '/assets/props/food/food-chicken.png',
@@ -139,7 +166,7 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
-  const [decorationInventory, setDecorationInventory] = useState<string[]>(() => load('pocket-decoration-inventory', []))
+  const [decorationInventory, setDecorationInventory] = useState<string[]>(() => [...new Set([...load<string[]>('pocket-decoration-inventory', []), ...starterFurnitureIds])])
   const [equippedDecorations, setEquippedDecorations] = useState<string[]>(() => load('pocket-equipped-decorations', []))
   const [decorationZone, setDecorationZone] = useState<DecorationZone>('media')
   const [shopTab, setShopTab] = useState<'room' | 'store' | 'inventory'>('room')
@@ -332,7 +359,7 @@ export default function App() {
         {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
       </div>
       <div className="decoration-layer" aria-hidden="true">
-        {displayedDecorations.map(item => { const placement = roomPlacements[equippedSkin][item.slot]; const scale = item.width / ({ 'media-screen': 23, 'media-console': 10, 'upper-wall': 20, 'right-appliance': 9, 'right-corner': 10, 'floor-left': 13, 'floor-center': 20, tabletop: 8, 'wall-accent': 8 } as Record<DecorationSlot, number>)[item.slot]; return <span className="placed-decoration" key={`${equippedSkin}-${item.id}`} style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--item-left': `${placement.left}%`, '--item-top': `${placement.top}%`, '--item-width': `${placement.width * scale}%` } as CSSProperties} /> })}
+        {displayedDecorations.map(item => { const placement = roomPlacements[equippedSkin][item.slot]; const scale = item.width / ({ 'media-screen': 23, 'media-console': 10, 'upper-wall': 20, 'right-appliance': 9, 'right-corner': 10, 'floor-left': 13, 'floor-center': 20, tabletop: 8, 'wall-accent': 8, bed: 36, storage: 20, 'main-rug': 42, seating: 38, 'media-unit': 29, 'side-table': 12, 'wall-shelf': 21, plant: 11 } as Record<DecorationSlot, number>)[item.slot]; return <span className="placed-decoration" key={`${equippedSkin}-${item.id}`} style={{ backgroundImage: `url(${item.asset ?? '/assets/decorations/room-items-sprite.png'})`, '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--sprite-columns': item.columns ?? 4, '--sprite-rows': item.rows ?? 4, '--sprite-x-divisor': (item.columns ?? 4) - 1, '--sprite-y-divisor': (item.rows ?? 4) - 1, '--item-left': `${placement.left}%`, '--item-top': `${placement.top}%`, '--item-width': `${placement.width * scale}%` } as CSSProperties} /> })}
       </div>
       <div className="time-switch" aria-label="방 시간대"><button className={timePhase === 'auto' ? 'active' : ''} onClick={() => setTimePhase('auto')}>자동</button><button className={timePhase === 'day' ? 'active' : ''} onClick={() => setTimePhase('day')}>낮</button><button className={timePhase === 'sunset' ? 'active' : ''} onClick={() => setTimePhase('sunset')}>노을</button><button className={timePhase === 'night' ? 'active' : ''} onClick={() => setTimePhase('night')}>밤</button></div>
       <div className="dog-wrap">
@@ -427,7 +454,7 @@ export default function App() {
       <div className="decoration-filters zone-filters">{decorationZones.map(zone => <button className={decorationZone === zone.value ? 'active' : ''} onClick={() => setDecorationZone(zone.value)} key={zone.value}><span>{zone.emoji}</span>{zone.label}</button>)}</div>
       <div className="zone-guide"><b>{decorationZones.find(zone => zone.value === decorationZone)?.label}</b><span>이 구역의 자리는 서로 겹치지 않게 고정됩니다.</span></div>
       <div className="decoration-grid">{decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).map(item => { const owned = decorationInventory.includes(item.id); const equipped = placedDecorations.some(placed => placed.id === item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
-        <div className="decoration-preview"><span style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY } as CSSProperties} /></div>
+        <div className="decoration-preview"><span style={{ backgroundImage: `url(${item.asset ?? '/assets/decorations/room-items-sprite.png'})`, '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--sprite-columns': item.columns ?? 4, '--sprite-rows': item.rows ?? 4, '--sprite-x-divisor': (item.columns ?? 4) - 1, '--sprite-y-divisor': (item.rows ?? 4) - 1 } as CSSProperties} /></div>
         <div className="decoration-copy"><h3>{item.name}</h3><span className="slot-label">⌖ {decorationSlots[item.slot]}</span><p>{item.description}</p></div>
         <button onClick={() => useDecoration(item)}>{!owned ? `🦴 ${item.price}개` : equipped ? '방에서 치우기' : '방에 놓기'}</button>
       </article> })}</div>
