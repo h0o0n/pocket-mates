@@ -9,7 +9,7 @@
 ```text
 web/public/assets/
 ├─ characters/
-│  └─ states/          # v0.6 PNG 상태 캐릭터 (neutral / chubby / very-chubby / receipt)
+│  └─ states/          # v0.6 PNG 상태 캐릭터 (neutral / chubby / very-chubby / receipt / eating)
 ├─ rooms/
 │  ├─ budget-states/   # 잔액 단계에 따라 변하는 기본 다락방
 │  └─ skins/           # 사용자가 구매·장착하는 별도 방 스킨

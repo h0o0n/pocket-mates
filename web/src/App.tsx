@@ -28,6 +28,8 @@ const roomImages = {
 } as const
 
 type SkinId = 'attic' | 'cloud' | 'game' | 'cafe' | 'library' | 'beach' | 'christmas' | 'camping'
+type OutfitId = 'none' | 'scarf' | 'sweater' | 'raincoat'
+type ListPeriod = 'weekly' | 'monthly' | 'yearly'
 
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
   { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
@@ -38,6 +40,14 @@ const roomSkins: Array<{ id: SkinId; name: string; description: string; price: n
   { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png' },
   { id: 'christmas', name: '크리스마스 거실', description: '트리 아래에서 잔액을 지키는 방', price: 500, image: '/assets/rooms/skins/christmas-nook.png' },
   { id: 'camping', name: '숲속 캠핑', description: '텐트 안에서는 충동구매도 한숨 돌리는 방', price: 380, image: '/assets/rooms/skins/forest-camp.png' },
+]
+
+/** 방 소품 대신 강아지 옷만 갈아입히는 방식 (통짜 PNG 교체) */
+const dogOutfits: Array<{ id: OutfitId; name: string; description: string; price: number; image: string | null; eatingImage: string }> = [
+  { id: 'none', name: '맨몸', description: '기본 지급 · 아무것도 안 입은 상태', price: 0, image: null, eatingImage: '/assets/characters/states/dog-eating.png' },
+  { id: 'scarf', name: '빨간 목도리', description: '추울 때 잔액도 같이 따뜻해 보이는 목도리', price: 120, image: '/assets/characters/outfits/scarf.png', eatingImage: '/assets/characters/states/dog-eating-scarf.png' },
+  { id: 'sweater', name: '니트 스웨터', description: '통통한 배가 더 티 나는 따뜻한 니트', price: 180, image: '/assets/characters/outfits/sweater.png', eatingImage: '/assets/characters/states/dog-eating-sweater.png' },
+  { id: 'raincoat', name: '하늘색 우비', description: '비 오는 날 충동구매를 막아 줄지도 모르는 우비', price: 220, image: '/assets/characters/outfits/raincoat.png', eatingImage: '/assets/characters/states/dog-eating-raincoat.png' },
 ]
 
 /** 식비 누적 시 랜덤하게 쌓이는 음식·배달 소품 (다양성 유지) */
@@ -80,6 +90,33 @@ const formattedInput = (value: string | number) => {
 const todayKey = new Date().toLocaleDateString('en-CA')
 const stableIndex = (value: string, length: number) => [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0) % length
 const dateKey = (date: Date) => date.toLocaleDateString('en-CA')
+const startOfWeek = (date: Date) => {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  next.setDate(next.getDate() - next.getDay())
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+/** 선택한 연·월에 겹치는 주(일~토) 목록을 만듭니다. */
+const weeksOverlappingMonth = (year: number, month: number) => {
+  const monthStart = new Date(year, month, 1)
+  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const weeks: Array<{ start: Date; end: Date; key: string; label: string }> = []
+  let cursor = startOfWeek(monthStart)
+  while (cursor <= monthEnd) {
+    const start = new Date(cursor)
+    const end = new Date(cursor)
+    end.setDate(end.getDate() + 7)
+    const lastDay = new Date(end.getTime() - 1)
+    weeks.push({
+      start,
+      end,
+      key: dateKey(start),
+      label: `${start.getMonth() + 1}/${start.getDate()} ~ ${lastDay.getMonth() + 1}/${lastDay.getDate()}`,
+    })
+    cursor.setDate(cursor.getDate() + 7)
+  }
+  return weeks
+}
 
 export default function App() {
   const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
@@ -95,14 +132,20 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
+  const [outfitInventory, setOutfitInventory] = useState<OutfitId[]>(() => load('pocket-outfit-inventory', ['none']))
+  const [equippedOutfit, setEquippedOutfit] = useState<OutfitId>(() => load('pocket-equipped-outfit', 'none'))
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
   const [viewMonth, setViewMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [historyView, setHistoryView] = useState<'calendar' | 'list'>('calendar')
-  const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [listPeriod, setListPeriod] = useState<ListPeriod>('monthly')
+  const [listYear, setListYear] = useState(() => new Date().getFullYear())
+  const [listMonth, setListMonth] = useState(() => new Date().getMonth())
+  const [listWeekKey, setListWeekKey] = useState(() => dateKey(startOfWeek(new Date())))
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
+  const [shopTab, setShopTab] = useState<'rooms' | 'outfits'>('rooms')
   // 강아지 짧은 모션 / 식비 랜덤 음식 연출 (PNG + CSS만 사용)
   const [dogMotion, setDogMotion] = useState<DogMotion | null>(null)
   const [activeSnack, setActiveSnack] = useState<(typeof snackBites)[number] | null>(null)
@@ -141,12 +184,20 @@ export default function App() {
       : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
         ? '/assets/characters/states/dog-receipt.png'
         : '/assets/characters/states/dog-neutral.png'
+  const equippedClothes = dogOutfits.find(outfit => outfit.id === equippedOutfit) ?? dogOutfits[0]
+  // 옷은 통짜 캐릭터 PNG로 갈아입히고, 먹기 연출에도 같은 옷의 먹기 포즈를 씁니다.
+  const dressedDogImage = equippedClothes.image ?? dogImage
+  const displayDogImage = dogMotion === 'eat'
+    ? equippedClothes.eatingImage
+    : dressedDogImage
 
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
   useEffect(() => localStorage.setItem('pocket-points', JSON.stringify(points)), [points])
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
+  useEffect(() => localStorage.setItem('pocket-outfit-inventory', JSON.stringify(outfitInventory)), [outfitInventory])
+  useEffect(() => localStorage.setItem('pocket-equipped-outfit', JSON.stringify(equippedOutfit)), [equippedOutfit])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
   useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
@@ -168,15 +219,15 @@ export default function App() {
     motionTimer.current = window.setTimeout(() => setDogMotion(null), durationMs)
   }
 
-  /** 식비 기록 시 랜덤 음식을 띄우고, 먹는 모션과 말풍선을 함께 보여 줍니다. */
+  /** 식비 기록 시 먹기 포즈 PNG로 바꾸고, 짧은 씹기 모션을 재생합니다. */
   const playSnackBite = () => {
     const snack = snackBites[Math.floor(Math.random() * snackBites.length)]
     window.clearTimeout(snackTimer.current)
     setActiveSnack(snack)
     setDogLine(snack.line)
     setBubbleVisible(true)
-    playDogMotion('eat', 1600)
-    snackTimer.current = window.setTimeout(() => setActiveSnack(null), 2200)
+    playDogMotion('eat', 2400)
+    snackTimer.current = window.setTimeout(() => setActiveSnack(null), 2500)
     return snack
   }
 
@@ -199,16 +250,25 @@ export default function App() {
   const selectedExpenses = expensesByDate[selectedDate] ?? []
   const selectedTotal = selectedExpenses.reduce((sum, expense) => sum + expense.amount, 0)
   const selectedBaseDate = new Date(`${selectedDate}T12:00:00`)
-  const weekStart = new Date(selectedBaseDate)
-  weekStart.setDate(selectedBaseDate.getDate() - selectedBaseDate.getDay())
-  weekStart.setHours(0, 0, 0, 0)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekStart.getDate() + 7)
+  const currentYear = new Date().getFullYear()
+  const listYears = useMemo(() => {
+    const years = new Set<number>([currentYear, listYear, viewMonth.getFullYear()])
+    for (const expense of expenses) years.add(new Date(expense.spentAt).getFullYear())
+    for (let year = currentYear; year >= currentYear - 5; year -= 1) years.add(year)
+    return [...years].sort((a, b) => b - a)
+  }, [expenses, listYear, viewMonth, currentYear])
+  const listWeeks = useMemo(() => weeksOverlappingMonth(listYear, listMonth), [listYear, listMonth])
+  const activeWeek = listWeeks.find(week => week.key === listWeekKey) ?? listWeeks[0]
+  useEffect(() => {
+    if (!listWeeks.some(week => week.key === listWeekKey) && listWeeks[0]) setListWeekKey(listWeeks[0].key)
+  }, [listWeeks, listWeekKey])
+
   const periodExpenses = expenses.filter(expense => {
     const spentDate = new Date(expense.spentAt)
-    if (listPeriod === 'daily') return dateKey(spentDate) === selectedDate
-    if (listPeriod === 'weekly') return spentDate >= weekStart && spentDate < weekEnd
-    return spentDate.getFullYear() === selectedBaseDate.getFullYear() && spentDate.getMonth() === selectedBaseDate.getMonth()
+    if (listPeriod === 'yearly') return spentDate.getFullYear() === listYear
+    if (listPeriod === 'monthly') return spentDate.getFullYear() === listYear && spentDate.getMonth() === listMonth
+    if (!activeWeek) return false
+    return spentDate >= activeWeek.start && spentDate < activeWeek.end
   })
   const visibleListExpenses = periodExpenses
     .filter(expense => listCategory === 'all' || expense.category === listCategory)
@@ -218,6 +278,11 @@ export default function App() {
     ...info,
     total: periodExpenses.filter(expense => expense.category === info.value).reduce((sum, expense) => sum + expense.amount, 0),
   })).filter(item => item.total > 0).sort((a, b) => b.total - a.total)
+  const periodLabel = listPeriod === 'yearly'
+    ? `${listYear}년`
+    : listPeriod === 'monthly'
+      ? `${listYear}년 ${listMonth + 1}월`
+      : `${listYear}년 ${listMonth + 1}월 · ${activeWeek?.label ?? ''}`
 
   useEffect(() => {
     const newlyCompleted = dailyMissions.filter(mission => mission.progress >= mission.goal && !claimedMissions.includes(mission.id))
@@ -281,14 +346,37 @@ export default function App() {
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
+  const useOutfit = (outfit: typeof dogOutfits[number]) => {
+    if (outfitInventory.includes(outfit.id)) {
+      setEquippedOutfit(outfit.id)
+      setMessage(outfit.id === 'none' ? '옷을 벗겼어요.' : `${outfit.name}을 입혔어요.`)
+      return
+    }
+    if (points < outfit.price) { setMessage(`뼈다귀가 ${outfit.price - points}개 부족해요.`); return }
+    setPoints(current => current - outfit.price)
+    setOutfitInventory(current => [...current, outfit.id])
+    setEquippedOutfit(outfit.id)
+    setMessage(`${outfit.name}을 구입하고 바로 입혔어요.`)
+  }
+  const clearPeriodRecords = () => {
+    if (!periodExpenses.length) return setMessage('지울 기록이 없어요.')
+    const ids = new Set(periodExpenses.map(expense => expense.id))
+    setExpenses(list => list.filter(expense => !ids.has(expense.id)))
+    setMessage(`${periodLabel} 기록 ${periodExpenses.length}건을 비웠어요.`)
+  }
   const moveMonth = (offset: number) => {
     const next = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + offset, 1)
     setViewMonth(next)
     setSelectedDate(dateKey(next))
   }
+  const setCalendarYearMonth = (year: number, month: number) => {
+    const next = new Date(year, month, 1)
+    setViewMonth(next)
+    setSelectedDate(dateKey(next))
+  }
 
   return <main className="app-shell">
-    <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
+    <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div></header>
 
     <section
       className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
@@ -306,17 +394,14 @@ export default function App() {
           <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
         ))}
       </div>
-      <div className={`dog-wrap ${dogMotion ? `motion-${dogMotion}` : ''}`}>
+      <div className={`dog-wrap ${dogMotion ? `is-busy motion-${dogMotion}` : 'is-wandering'}`}>
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
-        {activeSnack && (
-          <div className="snack-bite" aria-live="polite">
-            <img src={activeSnack.image} alt="" />
-            <span>{activeSnack.label}</span>
-          </div>
-        )}
-        <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
-          <img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />
-        </button>
+        {/* facing만 뒤집어 걸어 다니고, 말풍선 글자는 뒤집히지 않게 분리합니다. */}
+        <div className="dog-facing">
+          <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
+            <img className="dog-art" src={displayDogImage} alt={`현재 강아지 상태: ${status}${dogMotion === 'eat' && activeSnack ? `, ${activeSnack.label} 먹는 중` : ''}`} />
+          </button>
+        </div>
         {!bubbleVisible && !activeSnack && <span className="talk-hint">강아지를 눌러보세요</span>}
       </div>
     </section>
@@ -377,6 +462,18 @@ export default function App() {
       <div className="history-title"><div><small>HISTORY</small><h2>소비 기록</h2></div><b>{expenses.length}건</b></div>
       <div className="view-switch"><button className={historyView === 'calendar' ? 'active' : ''} onClick={() => setHistoryView('calendar')}>달력으로 보기</button><button className={historyView === 'list' ? 'active' : ''} onClick={() => setHistoryView('list')}>리스트로 보기</button></div>
       {historyView === 'calendar' ? <>
+        <div className="period-pickers" aria-label="달력 연월 선택">
+          <label>연도
+            <select value={viewMonth.getFullYear()} onChange={event => setCalendarYearMonth(Number(event.target.value), viewMonth.getMonth())}>
+              {listYears.map(year => <option value={year} key={year}>{year}년</option>)}
+            </select>
+          </label>
+          <label>월
+            <select value={viewMonth.getMonth()} onChange={event => setCalendarYearMonth(viewMonth.getFullYear(), Number(event.target.value))}>
+              {Array.from({ length: 12 }, (_, month) => <option value={month} key={month}>{month + 1}월</option>)}
+            </select>
+          </label>
+        </div>
         <div className="calendar-head"><button onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button><strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong><button onClick={() => moveMonth(1)} aria-label="다음 달">›</button></div>
         <div className="weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
         <div className="calendar-grid">{calendarCells.map((day, index) => {
@@ -390,25 +487,79 @@ export default function App() {
         <div className="selected-day-head"><div><b>{selectedBaseDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b><small>{selectedExpenses.length}건</small></div><strong>{won(selectedTotal)}원</strong></div>
         {selectedExpenses.length === 0 ? <p className="empty">이날은 기록이 없습니다.</p> : <ul>{selectedExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
       </> : <>
-        <div className="list-filters"><div>{(['daily', 'weekly', 'monthly'] as const).map(period => <button className={listPeriod === period ? 'active' : ''} onClick={() => setListPeriod(period)} key={period}>{period === 'daily' ? '일간' : period === 'weekly' ? '주간' : '월간'}</button>)}</div><select value={listCategory} onChange={event => setListCategory(event.target.value as 'all' | ExpenseCategory)}><option value="all">전체 유형</option>{categories.map(info => <option value={info.value} key={info.value}>{info.emoji} {info.label}</option>)}</select></div>
+        <div className="list-filters">
+          <div>{([
+            ['yearly', '연간'],
+            ['monthly', '월간'],
+            ['weekly', '주간'],
+          ] as const).map(([period, label]) => (
+            <button className={listPeriod === period ? 'active' : ''} onClick={() => setListPeriod(period)} key={period}>{label}</button>
+          ))}</div>
+          <select value={listCategory} onChange={event => setListCategory(event.target.value as 'all' | ExpenseCategory)}>
+            <option value="all">전체 유형</option>
+            {categories.map(info => <option value={info.value} key={info.value}>{info.emoji} {info.label}</option>)}
+          </select>
+        </div>
+        <div className="period-pickers" aria-label="조회 기간 선택">
+          <label>연도
+            <select value={listYear} onChange={event => setListYear(Number(event.target.value))}>
+              {listYears.map(year => <option value={year} key={year}>{year}년</option>)}
+            </select>
+          </label>
+          {listPeriod !== 'yearly' && (
+            <label>월
+              <select value={listMonth} onChange={event => setListMonth(Number(event.target.value))}>
+                {Array.from({ length: 12 }, (_, month) => <option value={month} key={month}>{month + 1}월</option>)}
+              </select>
+            </label>
+          )}
+          {listPeriod === 'weekly' && (
+            <label>주간
+              <select value={activeWeek?.key ?? ''} onChange={event => setListWeekKey(event.target.value)}>
+                {listWeeks.map(week => <option value={week.key} key={week.key}>{week.label}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="history-actions">
+          <button className="reset" type="button" onClick={clearPeriodRecords} disabled={!periodExpenses.length}>
+            {listPeriod === 'yearly' ? '선택한 연도 기록 비우기' : listPeriod === 'monthly' ? '선택한 달 기록 비우기' : '선택한 주 기록 비우기'}
+          </button>
+        </div>
         <div className="category-breakdown">{categoryBreakdown.length ? categoryBreakdown.map(item => <button className={listCategory === item.value ? 'active' : ''} onClick={() => setListCategory(item.value)} key={item.value}><span>{item.emoji}</span><small>{item.label}</small><b>{won(item.total)}원</b></button>) : <p>이 기간에는 기록이 없습니다.</p>}</div>
-        <div className="selected-day-head"><div><b>{listPeriod === 'daily' ? '선택한 날' : listPeriod === 'weekly' ? '선택한 주' : '선택한 달'}</b><small>{visibleListExpenses.length}건 · {listCategory === 'all' ? '전체 유형' : categoryInfo(listCategory).label}</small></div><strong>{won(listTotal)}원</strong></div>
+        <div className="selected-day-head"><div><b>{periodLabel}</b><small>{visibleListExpenses.length}건 · {listCategory === 'all' ? '전체 유형' : categoryInfo(listCategory).label}</small></div><strong>{won(listTotal)}원</strong></div>
         {visibleListExpenses.length === 0 ? <p className="empty">조건에 맞는 기록이 없습니다.</p> : <ul>{visibleListExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
       </>}
     </section>
 
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
-      <p className="shop-guide">매일 미션을 완료하면 뼈다귀를 받아요. 구입한 방은 소지품에 남아 언제든 다시 사용할 수 있습니다.</p>
-      <div className="skin-grid">{roomSkins.map(skin => {
-        const owned = inventory.includes(skin.id)
-        const equipped = equippedSkin === skin.id
-        return <article key={skin.id} className={equipped ? 'equipped' : ''}>
-          <img src={skin.image} alt={skin.name} />
-          <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
-          <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
-        </article>
-      })}</div>
+      <div className="history-title"><div><small>ROOM SHOP</small><h2>꾸미기</h2></div><b>🦴 {points}개</b></div>
+      <p className="shop-guide">방 스킨과 강아지 옷을 뼈다귀로 살 수 있어요. 가구 소품은 아직 바꾸지 않습니다.</p>
+      <div className="view-switch shop-tabs">
+        <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')}>방 스킨</button>
+        <button className={shopTab === 'outfits' ? 'active' : ''} onClick={() => setShopTab('outfits')}>강아지 옷</button>
+      </div>
+      {shopTab === 'rooms' ? (
+        <div className="skin-grid">{roomSkins.map(skin => {
+          const owned = inventory.includes(skin.id)
+          const equipped = equippedSkin === skin.id
+          return <article key={skin.id} className={equipped ? 'equipped' : ''}>
+            <img src={skin.image} alt={skin.name} />
+            <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
+            <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
+          </article>
+        })}</div>
+      ) : (
+        <div className="skin-grid outfit-grid">{dogOutfits.map(outfit => {
+          const owned = outfitInventory.includes(outfit.id)
+          const equipped = equippedOutfit === outfit.id
+          return <article key={outfit.id} className={equipped ? 'equipped' : ''}>
+            <img src={outfit.image ?? '/assets/characters/states/dog-neutral.png'} alt={outfit.name} />
+            <div><h3>{outfit.name}</h3><p>{outfit.description}</p></div>
+            <button onClick={() => useOutfit(outfit)} disabled={equipped}>{equipped ? '착용 중' : owned ? '입히기' : `🦴 ${outfit.price}개`}</button>
+          </article>
+        })}</div>
+      )}
     </section>
   </main>
 }
