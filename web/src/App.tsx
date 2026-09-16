@@ -425,7 +425,7 @@ export default function App() {
 
     <section
       className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
-      style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties}
+      style={{ '--wear': Math.max(0, Math.min(1, 1 - snapshot.remainingRatio)) } as CSSProperties}
       aria-label="강아지의 방"
     >
       {/* 방만 살짝 숨쉬게 두고, 강아지는 PNG 그대로 별도 모션 클래스를 씁니다. */}
