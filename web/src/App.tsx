@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { calculateBudget } from './domain/index.ts'
 import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
 
@@ -27,13 +27,17 @@ const roomImages = {
   speechless: '/assets/rooms/budget-states/attic-broke.png',
 } as const
 
-type SkinId = 'attic' | 'cloud' | 'game'
-type TimePhase = 'auto' | 'day' | 'sunset' | 'night'
+type SkinId = 'attic' | 'cloud' | 'game' | 'cafe' | 'library' | 'beach' | 'christmas' | 'camping'
 
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
-  { id: 'attic', name: '밤의 다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
-  { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
+  { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
+  { id: 'cloud', name: '구름방', description: '구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
   { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
+  { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png' },
+  { id: 'library', name: '조용한 도서관', description: '소비 충동을 책으로 덮는 방', price: 350, image: '/assets/rooms/skins/quiet-library.png' },
+  { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png' },
+  { id: 'christmas', name: '크리스마스 거실', description: '트리 아래에서 잔액을 지키는 방', price: 500, image: '/assets/rooms/skins/christmas-nook.png' },
+  { id: 'camping', name: '숲속 캠핑', description: '텐트 안에서는 충동구매도 한숨 돌리는 방', price: 380, image: '/assets/rooms/skins/forest-camp.png' },
 ]
 
 /** 식비 누적 시 랜덤하게 쌓이는 음식·배달 소품 (다양성 유지) */
@@ -43,6 +47,18 @@ const foodProps = [
   '/assets/props/food/food-cafe.png',
   '/assets/props/food/food-late-night.png',
 ] as const
+
+/** 식비 기록 시 잠깐 보여 줄 랜덤 음식 연출 목록 */
+const snackBites = [
+  { label: '치킨', image: '/assets/props/food/food-chicken.png', line: '치킨… 네가 시켰는데 왜 내가 먹고 있지.' },
+  { label: '카페 음료', image: '/assets/props/food/food-cafe.png', line: '커피는 네가 마시고, 배부른 건 나야.' },
+  { label: '야식', image: '/assets/props/food/food-late-night.png', line: '야식은 밤이 시킨 거야. 나는 피해자다.' },
+  { label: '배달 세트', image: '/assets/props/food/delivery-clutter.png', line: '배달 알림음이 제일 무서운 소리야.' },
+  { label: '국밥', image: '/assets/props/food/food-late-night.png', line: '뜨끈한 국밥… 잔액도 같이 녹는다.' },
+  { label: '디저트', image: '/assets/props/food/food-cafe.png', line: '달콤한 건 기분이고, 영수증은 현실이야.' },
+] as const
+
+type DogMotion = 'eat' | 'hop' | 'nod'
 
 const dialogue = {
   relaxed: ['왜 불렀어? 아직은 평화로운데.', '잔액 좋고, 창밖 좋고. 오늘은 합격.', '아무것도 안 사는 것도 능력이다.', '지금의 나를 기억해 둬. 곧 표정 바뀔 수도 있어.'],
@@ -79,8 +95,6 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
-  const [timePhase, setTimePhase] = useState<TimePhase>(() => load('pocket-time-phase', 'auto'))
-  const [clockHour, setClockHour] = useState(() => new Date().getHours())
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
@@ -89,6 +103,11 @@ export default function App() {
   const [historyView, setHistoryView] = useState<'calendar' | 'list'>('calendar')
   const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
+  // 강아지 짧은 모션 / 식비 랜덤 음식 연출 (PNG + CSS만 사용)
+  const [dogMotion, setDogMotion] = useState<DogMotion | null>(null)
+  const [activeSnack, setActiveSnack] = useState<(typeof snackBites)[number] | null>(null)
+  const motionTimer = useRef(0)
+  const snackTimer = useRef(0)
 
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
   const currentMonthExpenses = expenses.filter(x => {
@@ -123,26 +142,11 @@ export default function App() {
         ? '/assets/characters/states/dog-receipt.png'
         : '/assets/characters/states/dog-neutral.png'
 
-  const resolvedTimePhase = useMemo(() => {
-    if (timePhase !== 'auto') return timePhase
-    if (clockHour >= 7 && clockHour < 17) return 'day'
-    if (clockHour >= 17 && clockHour < 20) return 'sunset'
-    return 'night'
-  }, [timePhase, clockHour])
-
-  useEffect(() => {
-    const tick = () => setClockHour(new Date().getHours())
-    tick()
-    const timer = window.setInterval(tick, 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
   useEffect(() => localStorage.setItem('pocket-plan', JSON.stringify(plan)), [plan])
   useEffect(() => localStorage.setItem('pocket-expenses', JSON.stringify(expenses)), [expenses])
   useEffect(() => localStorage.setItem('pocket-points', JSON.stringify(points)), [points])
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
-  useEffect(() => localStorage.setItem('pocket-time-phase', JSON.stringify(timePhase)), [timePhase])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
   useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
@@ -151,6 +155,30 @@ export default function App() {
     const timer = window.setTimeout(() => setMessage(''), 2400)
     return () => window.clearTimeout(timer)
   }, [message])
+
+  useEffect(() => () => {
+    window.clearTimeout(motionTimer.current)
+    window.clearTimeout(snackTimer.current)
+  }, [])
+
+  /** PNG 캐릭터에 CSS 클래스만 잠깐 붙여 모션을 재생합니다. */
+  const playDogMotion = (motion: DogMotion, durationMs = 1400) => {
+    window.clearTimeout(motionTimer.current)
+    setDogMotion(motion)
+    motionTimer.current = window.setTimeout(() => setDogMotion(null), durationMs)
+  }
+
+  /** 식비 기록 시 랜덤 음식을 띄우고, 먹는 모션과 말풍선을 함께 보여 줍니다. */
+  const playSnackBite = () => {
+    const snack = snackBites[Math.floor(Math.random() * snackBites.length)]
+    window.clearTimeout(snackTimer.current)
+    setActiveSnack(snack)
+    setDogLine(snack.line)
+    setBubbleVisible(true)
+    playDogMotion('eat', 1600)
+    snackTimer.current = window.setTimeout(() => setActiveSnack(null), 2200)
+    return snack
+  }
 
   const dailyMissions = [
     { id: 'expense-3', title: '오늘 소비 3건 기록', progress: Math.min(3, todayExpenseCount), goal: 3, reward: 50 },
@@ -209,10 +237,27 @@ export default function App() {
   const saveExpense = (event: FormEvent) => {
     event.preventDefault()
     const parsed = numberFromInput(amount)
-    if (!memo.trim()) return setMessage('어디에 썼는지 한 줄만 적어주세요.')
+    const memoText = memo.trim()
+    if (!memoText) return setMessage('어디에 썼는지 한 줄만 적어주세요.')
     if (!Number.isFinite(parsed) || parsed <= 0) return setMessage('사용 금액을 올바르게 입력해주세요.')
-    setExpenses(list => [{ id: crypto.randomUUID(), category, amount: parsed, memo: memo.trim(), spentAt: new Date().toISOString() }, ...list])
-    setMemo(''); setAmount(''); setMessage(`${memo.trim()} ${won(parsed)}원을 기록했어요.`)
+    setExpenses(list => [{ id: crypto.randomUUID(), category, amount: parsed, memo: memoText, spentAt: new Date().toISOString() }, ...list])
+    setMemo(''); setAmount('')
+
+    const isFood = category === 'coffee' || category === 'delivery' || category === 'dining'
+    if (isFood) {
+      const snack = playSnackBite()
+      setMessage(`${memoText} ${won(parsed)}원 · 강아지가 「${snack.label}」 먹는 중`)
+      return
+    }
+    if (category === 'shopping') {
+      playDogMotion('hop', 1200)
+      setDogLine('택배… 설레는 척하지 마. 잔액이 먼저 도착했어.')
+      setBubbleVisible(true)
+      setMessage(`${memoText} ${won(parsed)}원을 기록했어요.`)
+      return
+    }
+    playDogMotion('nod', 1000)
+    setMessage(`${memoText} ${won(parsed)}원을 기록했어요.`)
   }
   const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: numberFromInput(value) }))
   const addQuickAmount = (value: number) => setAmount(current => String(numberFromInput(current) + value))
@@ -246,11 +291,12 @@ export default function App() {
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
     <section
-      className={`attic stage-${snapshot.stage} time-${resolvedTimePhase} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
+      className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
       style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties}
       aria-label="강아지의 방"
     >
-      <img className="room-art" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
+      {/* 방만 살짝 숨쉬게 두고, 강아지는 PNG 그대로 별도 모션 클래스를 씁니다. */}
+      <img className="room-art room-breathe" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
       {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
       <div className="prop-layer" aria-hidden="true">
         {deliveryPiles.map((source, index) => (
@@ -260,19 +306,18 @@ export default function App() {
           <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
         ))}
       </div>
-      <div className="time-switch" aria-label="방 시간대">
-        {(['auto', 'day', 'sunset', 'night'] as const).map(value => (
-          <button key={value} className={timePhase === value ? 'active' : ''} onClick={() => setTimePhase(value)}>
-            {{ auto: '자동', day: '낮', sunset: '노을', night: '밤' }[value]}
-          </button>
-        ))}
-      </div>
-      <div className="dog-wrap">
+      <div className={`dog-wrap ${dogMotion ? `motion-${dogMotion}` : ''}`}>
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
+        {activeSnack && (
+          <div className="snack-bite" aria-live="polite">
+            <img src={activeSnack.image} alt="" />
+            <span>{activeSnack.label}</span>
+          </div>
+        )}
         <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
           <img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />
         </button>
-        {!bubbleVisible && <span className="talk-hint">강아지를 눌러보세요</span>}
+        {!bubbleVisible && !activeSnack && <span className="talk-hint">강아지를 눌러보세요</span>}
       </div>
     </section>
 

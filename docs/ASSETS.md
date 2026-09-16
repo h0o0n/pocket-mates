@@ -44,34 +44,14 @@ images/blog/
 ## 코드에서 사용하는 경로
 
 `web/public`이 웹 루트이므로 앱 코드에서는 `/assets/...`로 참조합니다. 파일을 옮기면 `web/src`의 경로도 함께 수정하고 반드시 빌드를 확인합니다.
-# 빈 방 및 가구 소품
+# 방 스킨
 
-- `rooms/empty-attic-night.png`: 고정 가구가 없는 밤의 다락방
-- `rooms/empty-cloud-sunset.png`: 고정 가구가 없는 구름 노을방
-- `rooms/empty-game-night.png`: 고정 가구가 없는 게임방 구조
-- `decorations/furniture-sprite.png`: 침대, 책장, 러그, 소파, TV장, 협탁, 벽 선반, 화분 4×2 스프라이트
-- `decorations/room-items-sprite.png`: 상점 소품 4×4 스프라이트
+방 분위기는 낮/밤 레이어가 아니라 **통짜 스킨 일러스트**로 표현합니다.
 
-## 창밖 시간대 레이어 (Lofi)
-
-방 전체 톤 필터만으로는 창밖이 바뀌는 느낌이 약해서, **창문 사각형 위에 sky 레이어**를 얹습니다.
-
-```text
-web/public/assets/rooms/windows/
-├─ sky-day.png      # 맑은 낮 하늘 / 먼 건물 실루엣
-├─ sky-sunset.png   # 노을·보라-주황 그라데이션
-└─ sky-night.png    # 밤하늘·희미한 도시 불빛
-```
-
-### 제작 규칙
-
-1. 캔버스 **16:9**, 해상도 권장 1280×720 이상
-2. **창문 유리 영역만** 그리거나, 전체 하늘 텍스처로 두고 앱이 `windowFrames`로 크롭
-3. 방 이미지와 **같은 카메라 높이·소실점**을 유지
-4. 이상적으로는 빈 방 PNG의 창문을 **어두운 단색/투명에 가깝게** 다시 뽑아, sky가 자연스럽게 비치게 함
-5. 파일이 없어도 CSS 그라데이션 폴백이 동작함
-
-앱의 창문 좌표는 `web/src/App.tsx`의 `windowFrames`입니다. 스킨마다 창 위치가 다르면 여기 %만 조정합니다.
+- `rooms/budget-states/`: 기본 다락방 (잔액 단계 5장)
+- `rooms/skins/`: 구매·장착용 별도 방 스킨
+  - `cloud-dawn.png`, `weekend-game.png`
+  - `cafe-corner.png`, `quiet-library.png`, `beach-cabin.png`, `christmas-nook.png`, `forest-camp.png`
 
 ## 소품이 방과 안 어울릴 때 (크기·각도)
 
