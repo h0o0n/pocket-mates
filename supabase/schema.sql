@@ -293,6 +293,11 @@ create table if not exists public.shop_items (
   created_at timestamptz not null default now()
 );
 
+alter table public.shop_items add column if not exists category text;
+alter table public.shop_items add column if not exists sprite_column smallint;
+alter table public.shop_items add column if not exists sprite_row smallint;
+alter table public.shop_items add column if not exists placement jsonb not null default '{}'::jsonb;
+
 insert into public.shop_items (id, item_type, name, description, price, asset_path)
 values
   ('attic', 'room_skin', '밤의 다락방', '처음 지급되는 기본 방', 0, '/assets/rooms/budget-states/attic-cozy.png'),
@@ -304,6 +309,29 @@ on conflict (id) do update set
   price = excluded.price,
   asset_path = excluded.asset_path;
 
+insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement)
+values
+  ('tv', 'decoration', 'appliance', '작은 TV', '주말을 순식간에 없애는 화면', 180, '/assets/decorations/room-items-sprite.png', 0, 0, '{"left":6,"top":51,"width":25}'),
+  ('console', 'decoration', 'appliance', '게임기', '할 게임은 많은데 시간은 없음', 220, '/assets/decorations/room-items-sprite.png', 1, 0, '{"left":20,"top":69,"width":16}'),
+  ('air-conditioner', 'decoration', 'appliance', '에어컨', '강아지 털도 여름은 덥습니다', 260, '/assets/decorations/room-items-sprite.png', 2, 0, '{"left":37,"top":7,"width":22}'),
+  ('air-purifier', 'decoration', 'appliance', '공기청정기', '털은 못 잡아도 기분은 상쾌', 160, '/assets/decorations/room-items-sprite.png', 3, 0, '{"left":86,"top":54,"width":10}'),
+  ('air-fryer', 'decoration', 'appliance', '에어프라이어', '냉동 감자의 최종 목적지', 140, '/assets/decorations/room-items-sprite.png', 0, 1, '{"left":74,"top":62,"width":11}'),
+  ('christmas-tree', 'decoration', 'christmas', '미니 트리', '방 한쪽만 갑자기 연말', 200, '/assets/decorations/room-items-sprite.png', 1, 1, '{"left":79,"top":34,"width":18}'),
+  ('string-lights', 'decoration', 'christmas', '전구 가랜드', '전기세보다 분위기가 먼저', 110, '/assets/decorations/room-items-sprite.png', 2, 1, '{"left":32,"top":7,"width":35}'),
+  ('gift-boxes', 'decoration', 'christmas', '선물상자', '내용물은 아직 비밀', 90, '/assets/decorations/room-items-sprite.png', 3, 1, '{"left":66,"top":70,"width":15}'),
+  ('picnic-basket', 'decoration', 'picnic', '피크닉 바구니', '날씨 좋은 날 들고 나가기', 130, '/assets/decorations/room-items-sprite.png', 0, 2, '{"left":6,"top":67,"width":17}'),
+  ('picnic-mat', 'decoration', 'picnic', '체크 돗자리', '펴면 어디든 한강 느낌', 100, '/assets/decorations/room-items-sprite.png', 1, 2, '{"left":34,"top":75,"width":26}'),
+  ('camp-lantern', 'decoration', 'picnic', '캠핑 랜턴', '방 안인데 괜히 캠핑 기분', 120, '/assets/decorations/room-items-sprite.png', 2, 2, '{"left":68,"top":55,"width":10}'),
+  ('floor-lamp', 'decoration', 'lighting', '플로어 조명', '천장등 끄면 감성 두 배', 150, '/assets/decorations/room-items-sprite.png', 3, 2, '{"left":88,"top":36,"width":9}'),
+  ('mood-light', 'decoration', 'lighting', '버섯 무드등', '쓸모보다 귀여움이 중요', 100, '/assets/decorations/room-items-sprite.png', 0, 3, '{"left":58,"top":69,"width":8}'),
+  ('wall-clock', 'decoration', 'retro', '레트로 벽시계', '시간은 가고 월급날은 안 옴', 120, '/assets/decorations/room-items-sprite.png', 1, 3, '{"left":69,"top":13,"width":9}'),
+  ('retro-radio', 'decoration', 'retro', '빈티지 라디오', '주파수보다 분위기 수신 중', 140, '/assets/decorations/room-items-sprite.png', 2, 3, '{"left":75,"top":57,"width":12}'),
+  ('turntable', 'decoration', 'retro', '턴테이블', '한 면 듣고 뒤집는 부지런함', 190, '/assets/decorations/room-items-sprite.png', 3, 3, '{"left":39,"top":62,"width":15}')
+on conflict (id) do update set
+  category = excluded.category, name = excluded.name, description = excluded.description,
+  price = excluded.price, asset_path = excluded.asset_path, sprite_column = excluded.sprite_column,
+  sprite_row = excluded.sprite_row, placement = excluded.placement;
+
 create table if not exists public.user_inventory (
   user_id uuid not null references auth.users (id) on delete cascade,
   item_id text not null references public.shop_items (id) on delete restrict,
@@ -313,6 +341,8 @@ create table if not exists public.user_inventory (
 
 alter table public.companion_states
   add column if not exists equipped_room_skin text not null default 'attic';
+alter table public.companion_states
+  add column if not exists equipped_decorations text[] not null default '{}';
 
 create index if not exists user_inventory_user_id_idx
   on public.user_inventory (user_id);

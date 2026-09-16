@@ -30,6 +30,34 @@ const roomSkins: Array<{ id: SkinId; name: string; description: string; price: n
   { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
   { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
 ]
+type DecorationCategory = 'appliance' | 'christmas' | 'picnic' | 'lighting' | 'retro'
+type Decoration = {
+  id: string; name: string; description: string; category: DecorationCategory; price: number
+  spriteX: number; spriteY: number; left: number; top: number; width: number
+}
+const decorationCategories: Array<{ value: 'all' | DecorationCategory; label: string; emoji: string }> = [
+  { value: 'all', label: '전체', emoji: '⌂' }, { value: 'appliance', label: '가전', emoji: '📺' },
+  { value: 'christmas', label: '크리스마스', emoji: '🎄' }, { value: 'picnic', label: '피크닉', emoji: '🧺' },
+  { value: 'lighting', label: '조명', emoji: '💡' }, { value: 'retro', label: '레트로', emoji: '📻' },
+]
+const decorations: Decoration[] = [
+  { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, left: 6, top: 51, width: 25 },
+  { id: 'console', name: '게임기', description: '할 게임은 많은데 시간은 없음', category: 'appliance', price: 220, spriteX: 1, spriteY: 0, left: 20, top: 69, width: 16 },
+  { id: 'air-conditioner', name: '에어컨', description: '강아지 털도 여름은 덥습니다', category: 'appliance', price: 260, spriteX: 2, spriteY: 0, left: 37, top: 7, width: 22 },
+  { id: 'air-purifier', name: '공기청정기', description: '털은 못 잡아도 기분은 상쾌', category: 'appliance', price: 160, spriteX: 3, spriteY: 0, left: 86, top: 54, width: 10 },
+  { id: 'air-fryer', name: '에어프라이어', description: '냉동 감자의 최종 목적지', category: 'appliance', price: 140, spriteX: 0, spriteY: 1, left: 74, top: 62, width: 11 },
+  { id: 'christmas-tree', name: '미니 트리', description: '방 한쪽만 갑자기 연말', category: 'christmas', price: 200, spriteX: 1, spriteY: 1, left: 79, top: 34, width: 18 },
+  { id: 'string-lights', name: '전구 가랜드', description: '전기세보다 분위기가 먼저', category: 'christmas', price: 110, spriteX: 2, spriteY: 1, left: 32, top: 7, width: 35 },
+  { id: 'gift-boxes', name: '선물상자', description: '내용물은 아직 비밀', category: 'christmas', price: 90, spriteX: 3, spriteY: 1, left: 66, top: 70, width: 15 },
+  { id: 'picnic-basket', name: '피크닉 바구니', description: '날씨 좋은 날 들고 나가기', category: 'picnic', price: 130, spriteX: 0, spriteY: 2, left: 6, top: 67, width: 17 },
+  { id: 'picnic-mat', name: '체크 돗자리', description: '펴면 어디든 한강 느낌', category: 'picnic', price: 100, spriteX: 1, spriteY: 2, left: 34, top: 75, width: 26 },
+  { id: 'camp-lantern', name: '캠핑 랜턴', description: '방 안인데 괜히 캠핑 기분', category: 'picnic', price: 120, spriteX: 2, spriteY: 2, left: 68, top: 55, width: 10 },
+  { id: 'floor-lamp', name: '플로어 조명', description: '천장등 끄면 감성 두 배', category: 'lighting', price: 150, spriteX: 3, spriteY: 2, left: 88, top: 36, width: 9 },
+  { id: 'mood-light', name: '버섯 무드등', description: '쓸모보다 귀여움이 중요', category: 'lighting', price: 100, spriteX: 0, spriteY: 3, left: 58, top: 69, width: 8 },
+  { id: 'wall-clock', name: '레트로 벽시계', description: '시간은 가고 월급날은 안 옴', category: 'retro', price: 120, spriteX: 1, spriteY: 3, left: 69, top: 13, width: 9 },
+  { id: 'retro-radio', name: '빈티지 라디오', description: '주파수보다 분위기 수신 중', category: 'retro', price: 140, spriteX: 2, spriteY: 3, left: 75, top: 57, width: 12 },
+  { id: 'turntable', name: '턴테이블', description: '한 면 듣고 뒤집는 부지런함', category: 'retro', price: 190, spriteX: 3, spriteY: 3, left: 39, top: 62, width: 15 },
+]
 const foodProps = [
   '/assets/props/food/delivery-clutter.png',
   '/assets/props/food/food-chicken.png',
@@ -71,6 +99,9 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
+  const [decorationInventory, setDecorationInventory] = useState<string[]>(() => load('pocket-decoration-inventory', []))
+  const [equippedDecorations, setEquippedDecorations] = useState<string[]>(() => load('pocket-equipped-decorations', []))
+  const [decorationFilter, setDecorationFilter] = useState<'all' | DecorationCategory>('all')
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
@@ -109,6 +140,8 @@ export default function App() {
   useEffect(() => localStorage.setItem('pocket-points', JSON.stringify(points)), [points])
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
+  useEffect(() => localStorage.setItem('pocket-decoration-inventory', JSON.stringify(decorationInventory)), [decorationInventory])
+  useEffect(() => localStorage.setItem('pocket-equipped-decorations', JSON.stringify(equippedDecorations)), [equippedDecorations])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
   useEffect(() => localStorage.setItem(`pocket-missions-${todayKey}`, JSON.stringify(claimedMissions)), [claimedMissions])
@@ -198,6 +231,23 @@ export default function App() {
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
+  const useDecoration = (item: Decoration) => {
+    if (!decorationInventory.includes(item.id)) {
+      if (points < item.price) { setMessage(`뼈다귀가 ${item.price - points}개 부족해요.`); return }
+      setPoints(current => current - item.price)
+      setDecorationInventory(current => [...current, item.id])
+      setEquippedDecorations(current => [...current, item.id])
+      setMessage(`${item.name}을 구입하고 방에 놓았어요.`)
+      return
+    }
+    if (equippedDecorations.includes(item.id)) {
+      setEquippedDecorations(current => current.filter(id => id !== item.id))
+      setMessage(`${item.name}을 소지품에 넣었어요.`)
+    } else {
+      setEquippedDecorations(current => [...current, item.id])
+      setMessage(`${item.name}을 방에 다시 놓았어요.`)
+    }
+  }
   const moveMonth = (offset: number) => {
     const next = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + offset, 1)
     setViewMonth(next)
@@ -213,6 +263,9 @@ export default function App() {
       <div className="prop-layer" aria-hidden="true">
         {deliveryPiles.map((source, index) => <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />)}
         {Array.from({ length: parcelPileCount }, (_, index) => <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />)}
+      </div>
+      <div className="decoration-layer" aria-hidden="true">
+        {decorations.filter(item => equippedDecorations.includes(item.id)).map(item => <span className="placed-decoration" key={item.id} style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY, '--item-left': `${item.left}%`, '--item-top': `${item.top}%`, '--item-width': `${item.width}%` } as CSSProperties} />)}
       </div>
       <div className="dog-wrap">
         {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
@@ -294,12 +347,20 @@ export default function App() {
       </>}
     </section>
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
-      <p className="shop-guide">매일 미션을 완료하면 뼈다귀를 받아요. 구입한 방은 소지품에 남아 언제든 다시 사용할 수 있습니다.</p>
+      <div className="history-title"><div><small>ROOM SHOP</small><h2>방과 소품 꾸미기</h2></div><b>🦴 {points}개</b></div>
+      <p className="shop-guide">구입한 방과 소품은 소지품에 계속 남습니다. 소품은 여러 개를 동시에 놓거나 각각 치울 수 있어요.</p>
+      <div className="shop-section-title"><div><span>ROOM</span><h3>방 스킨</h3></div><small>한 번에 하나 사용</small></div>
       <div className="skin-grid">{roomSkins.map(skin => { const owned = inventory.includes(skin.id); const equipped = equippedSkin === skin.id; return <article key={skin.id} className={equipped ? 'equipped' : ''}>
         <img src={skin.image} alt={`${skin.name} 미리보기`} />
         <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
         <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
+      </article> })}</div>
+      <div className="shop-section-title decoration-heading"><div><span>ITEMS</span><h3>방 꾸미기 소품</h3></div><small>{decorationInventory.length}/{decorations.length}개 보유</small></div>
+      <div className="decoration-filters">{decorationCategories.map(filter => <button className={decorationFilter === filter.value ? 'active' : ''} onClick={() => setDecorationFilter(filter.value)} key={filter.value}><span>{filter.emoji}</span>{filter.label}</button>)}</div>
+      <div className="decoration-grid">{decorations.filter(item => decorationFilter === 'all' || item.category === decorationFilter).map(item => { const owned = decorationInventory.includes(item.id); const equipped = equippedDecorations.includes(item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
+        <div className="decoration-preview"><span style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY } as CSSProperties} /></div>
+        <div className="decoration-copy"><h3>{item.name}</h3><p>{item.description}</p></div>
+        <button onClick={() => useDecoration(item)}>{!owned ? `🦴 ${item.price}개` : equipped ? '방에서 치우기' : '방에 놓기'}</button>
       </article> })}</div>
     </section>
   </main>

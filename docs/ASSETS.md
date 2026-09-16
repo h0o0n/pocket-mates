@@ -16,8 +16,11 @@ web/public/assets/
 ├─ props/
 │  ├─ food/            # 식비·배달 횟수로 쌓이는 소품
 │  └─ shopping/        # 쇼핑 횟수로 쌓이는 소품
+├─ decorations/        # 사용자가 구매해 방에 배치하는 꾸미기 소품
 └─ ui/                 # 파비콘, 공통 아이콘 등 화면 요소
 ```
+
+`decorations/room-items-sprite.png`는 4×4 소품 시트입니다. 소품 순서와 좌표는 `web/src/App.tsx`의 `decorations` 목록 및 Supabase `shop_items` 데이터가 함께 관리합니다.
 
 파일명은 `대상-상태.png` 형식을 권장합니다. 같은 자산의 수정본을 교체할 때는 파일명에 `final`, `최종`, 날짜를 붙이지 않고 Git 이력으로 관리합니다.
 
