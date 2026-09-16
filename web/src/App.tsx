@@ -41,28 +41,34 @@ const decorationSlots: Record<DecorationSlot, string> = {
   'right-appliance': '오른쪽 가전 자리', 'right-corner': '오른쪽 구석', 'floor-left': '왼쪽 바닥',
   'floor-center': '가운데 바닥', tabletop: '테이블 위', 'wall-accent': '오른쪽 벽',
 }
-const decorationCategories: Array<{ value: 'all' | DecorationCategory; label: string; emoji: string }> = [
-  { value: 'all', label: '전체', emoji: '⌂' }, { value: 'appliance', label: '가전', emoji: '📺' },
-  { value: 'christmas', label: '크리스마스', emoji: '🎄' }, { value: 'picnic', label: '피크닉', emoji: '🧺' },
-  { value: 'lighting', label: '조명', emoji: '💡' }, { value: 'retro', label: '레트로', emoji: '📻' },
+type DecorationZone = 'media' | 'wall' | 'table' | 'floor' | 'right'
+const decorationZones: Array<{ value: DecorationZone; label: string; emoji: string }> = [
+  { value: 'media', label: 'TV존', emoji: '📺' }, { value: 'wall', label: '벽', emoji: '🖼️' },
+  { value: 'table', label: '테이블', emoji: '🪵' }, { value: 'floor', label: '바닥', emoji: '🧺' },
+  { value: 'right', label: '오른쪽', emoji: '🪴' },
 ]
+const slotZones: Record<DecorationSlot, DecorationZone> = {
+  'media-screen': 'media', 'media-console': 'media', 'upper-wall': 'wall', 'wall-accent': 'wall',
+  tabletop: 'table', 'floor-left': 'floor', 'floor-center': 'floor',
+  'right-appliance': 'right', 'right-corner': 'right',
+}
 const decorations: Decoration[] = [
-  { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, slot: 'media-screen', left: 6, top: 50, width: 25 },
-  { id: 'console', name: '게임기', description: '할 게임은 많은데 시간은 없음', category: 'appliance', price: 220, spriteX: 1, spriteY: 0, slot: 'media-console', left: 20, top: 70, width: 13 },
+  { id: 'tv', name: '작은 TV', description: '주말을 순식간에 없애는 화면', category: 'appliance', price: 180, spriteX: 0, spriteY: 0, slot: 'media-screen', left: 5, top: 48, width: 23 },
+  { id: 'console', name: '게임기', description: '할 게임은 많은데 시간은 없음', category: 'appliance', price: 220, spriteX: 1, spriteY: 0, slot: 'media-console', left: 10, top: 72, width: 10 },
   { id: 'air-conditioner', name: '에어컨', description: '강아지 털도 여름은 덥습니다', category: 'appliance', price: 260, spriteX: 2, spriteY: 0, slot: 'upper-wall', left: 38, top: 7, width: 20 },
-  { id: 'air-purifier', name: '공기청정기', description: '털은 못 잡아도 기분은 상쾌', category: 'appliance', price: 160, spriteX: 3, spriteY: 0, slot: 'right-appliance', left: 86, top: 55, width: 9 },
-  { id: 'air-fryer', name: '에어프라이어', description: '냉동 감자의 최종 목적지', category: 'appliance', price: 140, spriteX: 0, spriteY: 1, slot: 'right-appliance', left: 84, top: 58, width: 11 },
-  { id: 'christmas-tree', name: '미니 트리', description: '방 한쪽만 갑자기 연말', category: 'christmas', price: 200, spriteX: 1, spriteY: 1, slot: 'right-corner', left: 80, top: 37, width: 16 },
+  { id: 'air-purifier', name: '공기청정기', description: '털은 못 잡아도 기분은 상쾌', category: 'appliance', price: 160, spriteX: 3, spriteY: 0, slot: 'right-appliance', left: 85, top: 64, width: 8 },
+  { id: 'air-fryer', name: '에어프라이어', description: '냉동 감자의 최종 목적지', category: 'appliance', price: 140, spriteX: 0, spriteY: 1, slot: 'right-appliance', left: 84, top: 63, width: 9 },
+  { id: 'christmas-tree', name: '미니 트리', description: '방 한쪽만 갑자기 연말', category: 'christmas', price: 200, spriteX: 1, spriteY: 1, slot: 'right-corner', left: 83, top: 36, width: 12 },
   { id: 'string-lights', name: '전구 가랜드', description: '전기세보다 분위기가 먼저', category: 'christmas', price: 110, spriteX: 2, spriteY: 1, slot: 'upper-wall', left: 32, top: 7, width: 35 },
-  { id: 'gift-boxes', name: '선물상자', description: '내용물은 아직 비밀', category: 'christmas', price: 90, spriteX: 3, spriteY: 1, slot: 'floor-left', left: 8, top: 72, width: 14 },
-  { id: 'picnic-basket', name: '피크닉 바구니', description: '날씨 좋은 날 들고 나가기', category: 'picnic', price: 130, spriteX: 0, spriteY: 2, slot: 'floor-left', left: 6, top: 67, width: 16 },
-  { id: 'picnic-mat', name: '체크 돗자리', description: '펴면 어디든 한강 느낌', category: 'picnic', price: 100, spriteX: 1, spriteY: 2, slot: 'floor-center', left: 34, top: 76, width: 25 },
-  { id: 'camp-lantern', name: '캠핑 랜턴', description: '방 안인데 괜히 캠핑 기분', category: 'picnic', price: 120, spriteX: 2, spriteY: 2, slot: 'tabletop', left: 69, top: 56, width: 9 },
-  { id: 'floor-lamp', name: '플로어 조명', description: '천장등 끄면 감성 두 배', category: 'lighting', price: 150, spriteX: 3, spriteY: 2, slot: 'right-corner', left: 88, top: 38, width: 8 },
-  { id: 'mood-light', name: '버섯 무드등', description: '쓸모보다 귀여움이 중요', category: 'lighting', price: 100, spriteX: 0, spriteY: 3, slot: 'tabletop', left: 70, top: 58, width: 7 },
+  { id: 'gift-boxes', name: '선물상자', description: '내용물은 아직 비밀', category: 'christmas', price: 90, spriteX: 3, spriteY: 1, slot: 'floor-left', left: 4, top: 74, width: 12 },
+  { id: 'picnic-basket', name: '피크닉 바구니', description: '날씨 좋은 날 들고 나가기', category: 'picnic', price: 130, spriteX: 0, spriteY: 2, slot: 'floor-left', left: 4, top: 72, width: 13 },
+  { id: 'picnic-mat', name: '체크 돗자리', description: '펴면 어디든 한강 느낌', category: 'picnic', price: 100, spriteX: 1, spriteY: 2, slot: 'floor-center', left: 38, top: 78, width: 20 },
+  { id: 'camp-lantern', name: '캠핑 랜턴', description: '방 안인데 괜히 캠핑 기분', category: 'picnic', price: 120, spriteX: 2, spriteY: 2, slot: 'tabletop', left: 69, top: 58, width: 8 },
+  { id: 'floor-lamp', name: '플로어 조명', description: '천장등 끄면 감성 두 배', category: 'lighting', price: 150, spriteX: 3, spriteY: 2, slot: 'right-corner', left: 86, top: 38, width: 7 },
+  { id: 'mood-light', name: '버섯 무드등', description: '쓸모보다 귀여움이 중요', category: 'lighting', price: 100, spriteX: 0, spriteY: 3, slot: 'tabletop', left: 70, top: 59, width: 6 },
   { id: 'wall-clock', name: '레트로 벽시계', description: '시간은 가고 월급날은 안 옴', category: 'retro', price: 120, spriteX: 1, spriteY: 3, slot: 'wall-accent', left: 69, top: 14, width: 8 },
-  { id: 'retro-radio', name: '빈티지 라디오', description: '주파수보다 분위기 수신 중', category: 'retro', price: 140, spriteX: 2, spriteY: 3, slot: 'tabletop', left: 69, top: 57, width: 11 },
-  { id: 'turntable', name: '턴테이블', description: '한 면 듣고 뒤집는 부지런함', category: 'retro', price: 190, spriteX: 3, spriteY: 3, slot: 'tabletop', left: 68, top: 56, width: 13 },
+  { id: 'retro-radio', name: '빈티지 라디오', description: '주파수보다 분위기 수신 중', category: 'retro', price: 140, spriteX: 2, spriteY: 3, slot: 'tabletop', left: 68, top: 58, width: 9 },
+  { id: 'turntable', name: '턴테이블', description: '한 면 듣고 뒤집는 부지런함', category: 'retro', price: 190, spriteX: 3, spriteY: 3, slot: 'tabletop', left: 68, top: 57, width: 10 },
 ]
 const foodProps = [
   '/assets/props/food/delivery-clutter.png',
@@ -107,8 +113,8 @@ export default function App() {
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
   const [decorationInventory, setDecorationInventory] = useState<string[]>(() => load('pocket-decoration-inventory', []))
   const [equippedDecorations, setEquippedDecorations] = useState<string[]>(() => load('pocket-equipped-decorations', []))
-  const [decorationFilter, setDecorationFilter] = useState<'all' | DecorationCategory>('all')
-  const [shopTab, setShopTab] = useState<'room' | 'items'>('room')
+  const [decorationZone, setDecorationZone] = useState<DecorationZone>('media')
+  const [shopTab, setShopTab] = useState<'room' | 'store' | 'inventory'>('room')
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
@@ -366,19 +372,21 @@ export default function App() {
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
       <div className="history-title"><div><small>ROOM SHOP</small><h2>방과 소품 꾸미기</h2></div><b>🦴 {points}개</b></div>
       <p className="shop-guide">방과 소품은 탭에서 따로 고를 수 있어요. 소품은 정해진 자리에 놓이며, 같은 자리의 새 소품을 고르면 자동으로 교체됩니다.</p>
-      <div className="shop-tab-switch"><button className={shopTab === 'room' ? 'active' : ''} onClick={() => setShopTab('room')}>방 스킨</button><button className={shopTab === 'items' ? 'active' : ''} onClick={() => setShopTab('items')}>소품 꾸미기</button></div>
+      <div className="shop-tab-switch"><button className={shopTab === 'room' ? 'active' : ''} onClick={() => setShopTab('room')}>방 스킨</button><button className={shopTab === 'store' ? 'active' : ''} onClick={() => setShopTab('store')}>소품 상점</button><button className={shopTab === 'inventory' ? 'active' : ''} onClick={() => setShopTab('inventory')}>내 아이템</button></div>
       {shopTab === 'room' ? <><div className="shop-section-title"><div><span>ROOM</span><h3>방 스킨</h3></div><small>한 번에 하나 사용</small></div>
       <div className="skin-grid">{roomSkins.map(skin => { const owned = inventory.includes(skin.id); const equipped = equippedSkin === skin.id; return <article key={skin.id} className={equipped ? 'equipped' : ''}>
         <img src={skin.image} alt={`${skin.name} 미리보기`} />
         <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
         <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
-      </article> })}</div></> : <><div className="shop-section-title decoration-heading"><div><span>ITEMS</span><h3>방 꾸미기 소품</h3></div><small>{decorationInventory.length}/{decorations.length}개 보유</small></div>
-      <div className="decoration-filters">{decorationCategories.map(filter => <button className={decorationFilter === filter.value ? 'active' : ''} onClick={() => setDecorationFilter(filter.value)} key={filter.value}><span>{filter.emoji}</span>{filter.label}</button>)}</div>
-      <div className="decoration-grid">{decorations.filter(item => decorationFilter === 'all' || item.category === decorationFilter).map(item => { const owned = decorationInventory.includes(item.id); const equipped = placedDecorations.some(placed => placed.id === item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
+      </article> })}</div></> : <><div className="shop-section-title decoration-heading"><div><span>{shopTab === 'store' ? 'STORE' : 'MY ITEMS'}</span><h3>{shopTab === 'store' ? '소품 상점' : '내 아이템'}</h3></div><small>{shopTab === 'store' ? `${decorations.length - decorationInventory.length}개 구매 가능` : `${decorationInventory.length}개 보유`}</small></div>
+      <div className="decoration-filters zone-filters">{decorationZones.map(zone => <button className={decorationZone === zone.value ? 'active' : ''} onClick={() => setDecorationZone(zone.value)} key={zone.value}><span>{zone.emoji}</span>{zone.label}</button>)}</div>
+      <div className="zone-guide"><b>{decorationZones.find(zone => zone.value === decorationZone)?.label}</b><span>이 구역의 자리는 서로 겹치지 않게 고정됩니다.</span></div>
+      <div className="decoration-grid">{decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).map(item => { const owned = decorationInventory.includes(item.id); const equipped = placedDecorations.some(placed => placed.id === item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
         <div className="decoration-preview"><span style={{ '--sprite-x': item.spriteX, '--sprite-y': item.spriteY } as CSSProperties} /></div>
         <div className="decoration-copy"><h3>{item.name}</h3><span className="slot-label">⌖ {decorationSlots[item.slot]}</span><p>{item.description}</p></div>
         <button onClick={() => useDecoration(item)}>{!owned ? `🦴 ${item.price}개` : equipped ? '방에서 치우기' : '방에 놓기'}</button>
-      </article> })}</div></>}
+      </article> })}</div>
+      {decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).length === 0 && <div className="empty-inventory"><span>{shopTab === 'store' ? '✓' : '📦'}</span><b>{shopTab === 'store' ? '이 구역의 소품을 모두 보유 중이에요.' : '이 구역에 보유한 소품이 없어요.'}</b><small>{shopTab === 'store' ? '내 아이템 탭에서 배치할 수 있습니다.' : '소품 상점에서 먼저 구입해보세요.'}</small></div>}</>}
     </section>
   </main>
 }

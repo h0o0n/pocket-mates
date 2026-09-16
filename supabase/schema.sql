@@ -347,22 +347,22 @@ update public.shop_items set slot = case id
 where item_type = 'decoration';
 
 update public.shop_items set placement = case id
-  when 'tv' then '{"left":6,"top":50,"width":25}'::jsonb
-  when 'console' then '{"left":20,"top":70,"width":13}'::jsonb
+  when 'tv' then '{"left":5,"top":48,"width":23}'::jsonb
+  when 'console' then '{"left":10,"top":72,"width":10}'::jsonb
   when 'air-conditioner' then '{"left":38,"top":7,"width":20}'::jsonb
-  when 'air-purifier' then '{"left":86,"top":55,"width":9}'::jsonb
-  when 'air-fryer' then '{"left":84,"top":58,"width":11}'::jsonb
-  when 'christmas-tree' then '{"left":80,"top":37,"width":16}'::jsonb
+  when 'air-purifier' then '{"left":85,"top":64,"width":8}'::jsonb
+  when 'air-fryer' then '{"left":84,"top":63,"width":9}'::jsonb
+  when 'christmas-tree' then '{"left":83,"top":36,"width":12}'::jsonb
   when 'string-lights' then '{"left":32,"top":7,"width":35}'::jsonb
-  when 'gift-boxes' then '{"left":8,"top":72,"width":14}'::jsonb
-  when 'picnic-basket' then '{"left":6,"top":67,"width":16}'::jsonb
-  when 'picnic-mat' then '{"left":34,"top":76,"width":25}'::jsonb
-  when 'camp-lantern' then '{"left":69,"top":56,"width":9}'::jsonb
-  when 'floor-lamp' then '{"left":88,"top":38,"width":8}'::jsonb
-  when 'mood-light' then '{"left":70,"top":58,"width":7}'::jsonb
+  when 'gift-boxes' then '{"left":4,"top":74,"width":12}'::jsonb
+  when 'picnic-basket' then '{"left":4,"top":72,"width":13}'::jsonb
+  when 'picnic-mat' then '{"left":38,"top":78,"width":20}'::jsonb
+  when 'camp-lantern' then '{"left":69,"top":58,"width":8}'::jsonb
+  when 'floor-lamp' then '{"left":86,"top":38,"width":7}'::jsonb
+  when 'mood-light' then '{"left":70,"top":59,"width":6}'::jsonb
   when 'wall-clock' then '{"left":69,"top":14,"width":8}'::jsonb
-  when 'retro-radio' then '{"left":69,"top":57,"width":11}'::jsonb
-  when 'turntable' then '{"left":68,"top":56,"width":13}'::jsonb
+  when 'retro-radio' then '{"left":68,"top":58,"width":9}'::jsonb
+  when 'turntable' then '{"left":68,"top":57,"width":10}'::jsonb
   else placement end
 where item_type = 'decoration';
 
