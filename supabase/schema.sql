@@ -297,6 +297,7 @@ alter table public.shop_items add column if not exists category text;
 alter table public.shop_items add column if not exists sprite_column smallint;
 alter table public.shop_items add column if not exists sprite_row smallint;
 alter table public.shop_items add column if not exists placement jsonb not null default '{}'::jsonb;
+alter table public.shop_items add column if not exists slot text;
 
 insert into public.shop_items (id, item_type, name, description, price, asset_path)
 values
@@ -331,6 +332,39 @@ on conflict (id) do update set
   category = excluded.category, name = excluded.name, description = excluded.description,
   price = excluded.price, asset_path = excluded.asset_path, sprite_column = excluded.sprite_column,
   sprite_row = excluded.sprite_row, placement = excluded.placement;
+
+-- 소품은 자유 좌표가 아니라 방의 고정 슬롯에 배치됩니다.
+update public.shop_items set slot = case id
+  when 'tv' then 'media-screen' when 'console' then 'media-console'
+  when 'air-conditioner' then 'upper-wall' when 'string-lights' then 'upper-wall'
+  when 'air-purifier' then 'right-appliance' when 'air-fryer' then 'right-appliance'
+  when 'christmas-tree' then 'right-corner' when 'floor-lamp' then 'right-corner'
+  when 'gift-boxes' then 'floor-left' when 'picnic-basket' then 'floor-left'
+  when 'picnic-mat' then 'floor-center' when 'wall-clock' then 'wall-accent'
+  when 'camp-lantern' then 'tabletop' when 'mood-light' then 'tabletop'
+  when 'retro-radio' then 'tabletop' when 'turntable' then 'tabletop'
+  else slot end
+where item_type = 'decoration';
+
+update public.shop_items set placement = case id
+  when 'tv' then '{"left":6,"top":50,"width":25}'::jsonb
+  when 'console' then '{"left":20,"top":70,"width":13}'::jsonb
+  when 'air-conditioner' then '{"left":38,"top":7,"width":20}'::jsonb
+  when 'air-purifier' then '{"left":86,"top":55,"width":9}'::jsonb
+  when 'air-fryer' then '{"left":84,"top":58,"width":11}'::jsonb
+  when 'christmas-tree' then '{"left":80,"top":37,"width":16}'::jsonb
+  when 'string-lights' then '{"left":32,"top":7,"width":35}'::jsonb
+  when 'gift-boxes' then '{"left":8,"top":72,"width":14}'::jsonb
+  when 'picnic-basket' then '{"left":6,"top":67,"width":16}'::jsonb
+  when 'picnic-mat' then '{"left":34,"top":76,"width":25}'::jsonb
+  when 'camp-lantern' then '{"left":69,"top":56,"width":9}'::jsonb
+  when 'floor-lamp' then '{"left":88,"top":38,"width":8}'::jsonb
+  when 'mood-light' then '{"left":70,"top":58,"width":7}'::jsonb
+  when 'wall-clock' then '{"left":69,"top":14,"width":8}'::jsonb
+  when 'retro-radio' then '{"left":69,"top":57,"width":11}'::jsonb
+  when 'turntable' then '{"left":68,"top":56,"width":13}'::jsonb
+  else placement end
+where item_type = 'decoration';
 
 create table if not exists public.user_inventory (
   user_id uuid not null references auth.users (id) on delete cascade,
