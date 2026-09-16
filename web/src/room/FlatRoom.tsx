@@ -1,15 +1,18 @@
 import { useId, type CSSProperties } from 'react'
 import { FlatArt } from './FlatArt'
+import { DogReaction } from './DogReaction'
 import { placements, type Decoration, type SkinId, type TimePhase } from './catalog'
 import './flat-room.css'
 
 type Props = {
   skin: SkinId; phase: Exclude<TimePhase,'auto'>; selectedPhase:TimePhase; onPhase:(phase:TimePhase)=>void
-  items:Decoration[]; food:string[]; parcels:number; remaining:number; foodLevel:number
+  items:Decoration[]; food:string[]; parcels:number; remaining:number; foodLevel:number; shoppingCount?:number
   bubble:boolean; line:string; onTalk:()=>void; onClose:()=>void; miniature?:boolean
 }
 const box = (x:number,y:number,w:number,h:number):CSSProperties => ({left:`${x/10}%`,top:`${y/6.5}%`,width:`${w/10}%`,height:`${h/6.5}%`})
-export function FlatRoom({skin,phase,selectedPhase,onPhase,items,food,parcels,remaining,foodLevel,bubble,line,onTalk,onClose,miniature=false}:Props) {
+const foodSpots = [[22,543,94,79,-7],[91,527,87,74,6],[142,553,100,84,-4],[65,576,90,65,3]]
+const parcelSpots = [[785,559,105,78,-5],[858,558,92,79,5],[800,517,95,79,-2],[848,500,101,84,4]]
+export function FlatRoom({skin,phase,selectedPhase,onPhase,items,food,parcels,remaining,foodLevel,shoppingCount=0,bubble,line,onTalk,onClose,miniature=false}:Props) {
   const clip = useId()
   const worn = remaining <= .5, poor = remaining <= .25, broke = remaining <= .1
   const sorted = [...items].sort((a,b)=>(a.slot==='rug'?-1:b.slot==='rug'?1:placements[a.slot].y-placements[b.slot].y))
@@ -34,16 +37,16 @@ export function FlatRoom({skin,phase,selectedPhase,onPhase,items,food,parcels,re
       {poor && <g stroke="#b29c7e" strokeWidth="2"><path d="M160 288h34v35l-34-35" fill="#e5d3b7"/><path d="M175 292l16 18" fill="none"/><rect x="79" y="400" width="37" height="12" rx="2" fill="#d9c49c" transform="rotate(-15 79 400)"/></g>}
       {broke && <g fill="#dac39a" stroke="#ab9071" strokeWidth="2"><path d="M815 273l44 15-5 13-44-15Z M825 303l22-42 12 6-22 42Z"/><path d="M193 591l33-8m-22 19l24-7" fill="none"/></g>}
     </svg>
-    {sorted.map(item=>{ const p=item.id==='furniture-bookcase' ? {x:813,y:294,w:163,h:270} : item.id==='furniture-plant' ? {x:666,y:473,w:59,h:78} : placements[item.slot]; return <div className={`flat-prop prop-${item.id}`} key={item.id} style={box(p.x,p.y,p.w,p.h)}><FlatArt id={item.id}/>{poor && item.slot==='seat' && <span className="sofa-patch">×</span>}</div> })}
+    {sorted.map(item=>{ const p=item.id==='christmas-tree' ? {x:681,y:367,w:150,h:170} : item.id==='furniture-bookcase' ? {x:813,y:294,w:163,h:270} : item.id==='furniture-plant' ? {x:666,y:473,w:59,h:78} : placements[item.slot]; return <div className={`flat-prop prop-${item.id}`} key={item.id} style={box(p.x,p.y,p.w,p.h)}><FlatArt id={item.id}/>{poor && item.slot==='seat' && <span className="sofa-patch">×</span>}</div> })}
     {phase!=='day' && items.some(item=>['floor-lamp','mood-light','camp-lantern','string-lights'].includes(item.id)) && <div className="flat-light-glow"/>}
     <div className={`mochi-dog food-level-${foodLevel}`} style={box(370,421,260,180)}>
       {!miniature && bubble && <button className="mochi-speech" onClick={onClose}>{line}<small>눌러서 닫기</small></button>}
       <button className="mochi-touch" onClick={onTalk} aria-label="강아지와 대화하기" disabled={miniature}>
-        <span className="mochi-breathe"><img src="/assets/flat/mochi-dog.png" alt="멍하니 쉬는 찹쌀떡 강아지"/><span className="mochi-eyelid left"/><span className="mochi-eyelid right"/></span>
+        <span className="mochi-breathe"><img src="/assets/flat/mochi-dog.png" alt={`${foodLevel>0?'통통한 ':''}찹쌀떡 강아지${shoppingCount>=3?', 선글라스 착용':''}${remaining<=.5?', 영수증 확인 중':''}`}/><span className="mochi-eyelid left"/><span className="mochi-eyelid right"/><DogReaction foodLevel={foodLevel} remaining={remaining} shoppingCount={shoppingCount}/></span>
       </button>
     </div>
-    {food.map((id,i)=><div className="flat-clutter" key={`${i}-${id}`} style={box(22+i*43,553-(i%2)*13,69,59)}><FlatArt id={id}/></div>)}
-    {Array.from({length:parcels},(_,i)=><div className="flat-clutter" key={`parcel-${i}`} style={box(797+(i%2)*51,574-Math.floor(i/2)*38,72,61)}><FlatArt id="parcel"/></div>)}
+    {food.slice(0,4).map((id,i)=>{const [x,y,w,h,angle]=foodSpots[i]; return <div className="flat-clutter" key={`${i}-${id}`} style={{...box(x,y,w,h),rotate:`${angle}deg`}}><FlatArt id={id}/></div>})}
+    {Array.from({length:Math.min(4,parcels)},(_,i)=>{const [x,y,w,h,angle]=parcelSpots[i]; return <div className="flat-clutter" key={`parcel-${i}`} style={{...box(x,y,w,h),rotate:`${angle}deg`}}><FlatArt id={i===3?'parcel-open':'parcel'}/></div>})}
     {!miniature && <><div className="flat-time" aria-label="방 시간대">{(['auto','day','sunset','night'] as const).map(value=><button key={value} aria-pressed={selectedPhase===value} onClick={()=>onPhase(value)}>{ {auto:'자동',day:'낮',sunset:'노을',night:'밤'}[value]}</button>)}</div><span className="flat-room-note">{broke?'테이프로 버티는 중':poor?'조금 낡아도 우리 집':worn?'생활감이 생겼어요':'오늘도 느긋하게'} · 강아지를 눌러보세요</span></>}
   </section>
 }

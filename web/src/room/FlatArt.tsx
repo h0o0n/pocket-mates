@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
+import { ClutterArt } from './ClutterArt'
 
 /** All props share a 120 × 100 front-view canvas and the same outline. */
 export function FlatArt({ id }: { id: string }) {
+  if (id.startsWith('food-') || id.startsWith('parcel')) return <ClutterArt id={id}/>
   let art: ReactNode
   switch (id) {
     case 'furniture-bed':
@@ -80,5 +82,5 @@ export function FlatArt({ id }: { id: string }) {
     default:
       art = <><rect x="9" y="35" width="102" height="53" rx="12" fill="#f3e8d4"/><path d="M17 49H103 M45 49V80"/><path d="M57 62Q70 42 91 62Q86 81 65 75Z" fill="#cfa17b"/></>
   }
-  return <svg viewBox="0 0 120 100" preserveAspectRatio="none" aria-hidden="true" fill="none" stroke="#705139" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">{art}</svg>
+  return <svg viewBox="0 0 120 100" preserveAspectRatio={id==='christmas-tree'?'xMidYMax meet':'none'} aria-hidden="true" fill="none" stroke="#705139" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">{art}</svg>
 }

@@ -191,7 +191,12 @@ export default function App() {
   const addQuickAmount = (value: number) => setAmount(current => String(numberFromInput(current) + value))
   const categoryInfo = (value: ExpenseCategory) => categories.find(x => x.value === value) ?? categories.at(-1)!
   const talkToDog = () => {
-    const lines = dialogue[snapshot.stage]
+    const lines = [...dialogue[snapshot.stage],
+      ...(foodLevel>0 ? ['배달은 네가 시켰는데 배는 왜 내가 나오지.', '이 배에는 이번 달 식비가 들어 있어.'] : []),
+      ...(shoppingCount>=3 ? ['택배는 네 건데 선글라스는 내 거야.', '나 좀 멋있지. 잔액은 보지 마.'] : []),
+      ...(snapshot.remainingRatio<=.5 ? ['영수증 끝이 안 보이는데. 이거 맞아?', '이거 한 장이야. 이어 붙인 거 아니야.'] : []),
+      ...(foodLevel>0 && shoppingCount>=3 && snapshot.remainingRatio<=.5 ? ['배는 부르고 멋은 챙겼고… 계산은 네가 해.'] : []),
+    ]
     const candidates = lines.filter(candidate => candidate !== dogLine)
     setDogLine(candidates[Math.floor(Math.random() * candidates.length)] ?? lines[0])
     setBubbleVisible(true)
@@ -235,7 +240,7 @@ export default function App() {
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
     <FlatRoom skin={equippedSkin} phase={resolvedTimePhase} selectedPhase={timePhase} onPhase={setTimePhase}
-      items={placedDecorations} food={deliveryPiles} parcels={parcelPileCount} remaining={snapshot.remainingRatio} foodLevel={foodLevel}
+      items={placedDecorations} food={deliveryPiles} parcels={parcelPileCount} remaining={snapshot.remainingRatio} foodLevel={foodLevel} shoppingCount={shoppingCount}
       bubble={bubbleVisible} line={dogLine || line} onTalk={talkToDog} onClose={()=>setBubbleVisible(false)} />
 
     <section className="summary-grid">
