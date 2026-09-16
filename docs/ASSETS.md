@@ -9,18 +9,17 @@
 ```text
 web/public/assets/
 ├─ characters/
-│  └─ states/          # 소비 상태·체형에 따라 바뀌는 캐릭터
+│  └─ states/          # v0.6 PNG 상태 캐릭터 (neutral / chubby / very-chubby / receipt)
 ├─ rooms/
 │  ├─ budget-states/   # 잔액 단계에 따라 변하는 기본 다락방
 │  └─ skins/           # 사용자가 구매·장착하는 별도 방 스킨
 ├─ props/
 │  ├─ food/            # 식비·배달 횟수로 쌓이는 소품
 │  └─ shopping/        # 쇼핑 횟수로 쌓이는 소품
-├─ decorations/        # 사용자가 구매해 방에 배치하는 꾸미기 소품
 └─ ui/                 # 파비콘, 공통 아이콘 등 화면 요소
 ```
 
-`decorations/room-items-sprite.png`는 4×4 소품 시트입니다. 소품 순서와 좌표는 `web/src/App.tsx`의 `decorations` 목록 및 Supabase `shop_items` 데이터가 함께 관리합니다.
+강아지는 `characters/states/dog-*.png`만 사용합니다. `flat/mochi-dog.png`와 `web/src/room/FlatRoom`은 현재 런타임에서 쓰지 않습니다.
 
 파일명은 `대상-상태.png` 형식을 권장합니다. 같은 자산의 수정본을 교체할 때는 파일명에 `final`, `최종`, 날짜를 붙이지 않고 Git 이력으로 관리합니다.
 

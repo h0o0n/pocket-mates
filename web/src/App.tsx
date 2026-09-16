@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { calculateBudget } from './domain/index.ts'
-import { FlatRoom } from './room/FlatRoom'
-import { FlatArt } from './room/FlatArt'
-import { decorations, decorationSlots, decorationZones, slotZones, roomSkins, defaultRoomSets, starterFurnitureIds, normalizeItems, type SkinId, type Decoration, type DecorationZone, type TimePhase } from './room/catalog'
 import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
 
 const defaultPlan: BudgetPlan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
@@ -20,6 +17,33 @@ const copy = {
   worried: ['집안 사정 회의', '전등 하나 끄면 해결되는 문제인가.'],
   speechless: ['말을 잃음', '강아지와 방이 동시에 낡아가고 있다.'],
 } as const
+
+/** v0.6 스타일: 잔액에 따라 기본 다락방 일러스트가 바뀝니다. */
+const roomImages = {
+  relaxed: '/assets/rooms/budget-states/attic-cozy.png',
+  watching: '/assets/rooms/budget-states/attic-lived-in.png',
+  calculating: '/assets/rooms/budget-states/attic-worn.png',
+  worried: '/assets/rooms/budget-states/attic-struggling.png',
+  speechless: '/assets/rooms/budget-states/attic-broke.png',
+} as const
+
+type SkinId = 'attic' | 'cloud' | 'game'
+type TimePhase = 'auto' | 'day' | 'sunset' | 'night'
+
+const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
+  { id: 'attic', name: '밤의 다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
+  { id: 'cloud', name: '새벽 구름방', description: '아침놀과 구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
+  { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
+]
+
+/** 식비 누적 시 랜덤하게 쌓이는 음식·배달 소품 (다양성 유지) */
+const foodProps = [
+  '/assets/props/food/delivery-clutter.png',
+  '/assets/props/food/food-chicken.png',
+  '/assets/props/food/food-cafe.png',
+  '/assets/props/food/food-late-night.png',
+] as const
+
 const dialogue = {
   relaxed: ['왜 불렀어? 아직은 평화로운데.', '잔액 좋고, 창밖 좋고. 오늘은 합격.', '아무것도 안 사는 것도 능력이다.', '지금의 나를 기억해 둬. 곧 표정 바뀔 수도 있어.'],
   watching: ['슬슬 영수증이 말을 걸기 시작했어.', '그 결제, 미래의 네가 허락한 거 맞아?', '아직 괜찮아. 아직은.', '장바구니는 비웠는데 왜 잔액도 비었지?'],
@@ -55,44 +79,50 @@ export default function App() {
   const [points, setPoints] = useState(() => load('pocket-points', 500))
   const [inventory, setInventory] = useState<SkinId[]>(() => load('pocket-inventory', ['attic']))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => load('pocket-equipped-skin', 'attic'))
-  const [decorationInventory, setDecorationInventory] = useState<string[]>(() => [...new Set([...load<string[]>('pocket-decoration-inventory', []), ...starterFurnitureIds])])
-  const [roomLayouts, setRoomLayouts] = useState<Record<SkinId,string[]>>(() => {
-    const legacy = load<string[]>('pocket-equipped-decorations', [])
-    const saved = load<Partial<Record<SkinId,string[]>>>('pocket-flat-layouts-v1', {})
-    return Object.fromEntries((['attic','cloud','game'] as const).map(skin => [skin, normalizeItems(saved[skin] ?? [...defaultRoomSets[skin], ...legacy])])) as Record<SkinId,string[]>
-  })
-  const equippedDecorations = roomLayouts[equippedSkin]
-  const setEquippedDecorations = (update:(current:string[])=>string[]) => setRoomLayouts(current=>({...current,[equippedSkin]:normalizeItems(update(current[equippedSkin]))}))
-  const [decorationZone, setDecorationZone] = useState<DecorationZone>('media')
-  const [shopTab, setShopTab] = useState<'room' | 'store' | 'inventory'>('room')
   const [timePhase, setTimePhase] = useState<TimePhase>(() => load('pocket-time-phase', 'auto'))
+  const [clockHour, setClockHour] = useState(() => new Date().getHours())
   const [dailyTalks, setDailyTalks] = useState(() => load(`pocket-talks-${todayKey}`, 0))
   const [budgetChecked, setBudgetChecked] = useState(() => load(`pocket-budget-check-${todayKey}`, false))
   const [claimedMissions, setClaimedMissions] = useState<string[]>(() => load(`pocket-missions-${todayKey}`, []))
   const [viewMonth, setViewMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [historyView, setHistoryView] = useState<'calendar' | 'list'>('calendar')
-  const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
+  const [listPeriod, setListPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
+
   const snapshot = useMemo(() => calculateBudget(plan, expenses), [plan, expenses])
-  const currentMonthExpenses = expenses.filter(x => { const d = new Date(x.spentAt); const now = new Date(); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() })
-  const foodExpenses = currentMonthExpenses.filter(x => ['coffee', 'delivery', 'dining'].includes(x.category)).sort((a,b)=>a.spentAt.localeCompare(b.spentAt))
+  const currentMonthExpenses = expenses.filter(x => {
+    const d = new Date(x.spentAt)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+  const foodExpenses = currentMonthExpenses
+    .filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
+    .sort((a, b) => a.spentAt.localeCompare(b.spentAt))
   const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
   const foodExpenseCount = foodExpenses.length
   const shoppingCount = currentMonthExpenses.filter(x => x.category === 'shopping').length
   const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
   const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
+  // 같은 소비 시드면 항상 같은 음식 소품이 나와 다양성이 유지됩니다.
   const deliveryPiles = Array.from({ length: deliveryPileCount }, (_, index) => {
     const seedExpense = foodExpenses[index * 3 + 2] ?? foodExpenses[index * 3]
-    const variants = ['food-cup','food-pizza','food-bowl','food-lunch']
-    return variants[stableIndex(seedExpense?.id ?? String(index), variants.length)]
+    return foodProps[stableIndex(seedExpense?.id ?? String(index), foodProps.length)]
   })
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const foodRatio = snapshot.spendableBudget > 0 ? foodSpent / snapshot.spendableBudget : 0
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
-  const placedDecorations = useMemo(() => equippedDecorations.map(id=>decorations.find(item=>item.id===id)).filter((item):item is Decoration=>Boolean(item)), [equippedDecorations])
-  const [clockHour, setClockHour] = useState(() => new Date().getHours())
+  const equippedRoom = roomSkins.find(skin => skin.id === equippedSkin) ?? roomSkins[0]
+  const roomImage = equippedSkin === 'attic' ? roomImages[snapshot.stage] : equippedRoom.image
+  const dogImage = foodLevel === 2
+    ? '/assets/characters/states/dog-very-chubby.png'
+    : foodLevel === 1
+      ? '/assets/characters/states/dog-chubby.png'
+      : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
+        ? '/assets/characters/states/dog-receipt.png'
+        : '/assets/characters/states/dog-neutral.png'
+
   const resolvedTimePhase = useMemo(() => {
     if (timePhase !== 'auto') return timePhase
     if (clockHour >= 7 && clockHour < 17) return 'day'
@@ -100,7 +130,6 @@ export default function App() {
     return 'night'
   }, [timePhase, clockHour])
 
-  // 화면보호기처럼 auto 모드에서 시간이 지나면 창밖이 바뀌도록 1분마다 갱신합니다.
   useEffect(() => {
     const tick = () => setClockHour(new Date().getHours())
     tick()
@@ -113,8 +142,6 @@ export default function App() {
   useEffect(() => localStorage.setItem('pocket-points', JSON.stringify(points)), [points])
   useEffect(() => localStorage.setItem('pocket-inventory', JSON.stringify(inventory)), [inventory])
   useEffect(() => localStorage.setItem('pocket-equipped-skin', JSON.stringify(equippedSkin)), [equippedSkin])
-  useEffect(() => localStorage.setItem('pocket-decoration-inventory', JSON.stringify(decorationInventory)), [decorationInventory])
-  useEffect(() => localStorage.setItem('pocket-flat-layouts-v1', JSON.stringify(roomLayouts)), [roomLayouts])
   useEffect(() => localStorage.setItem('pocket-time-phase', JSON.stringify(timePhase)), [timePhase])
   useEffect(() => localStorage.setItem(`pocket-talks-${todayKey}`, JSON.stringify(dailyTalks)), [dailyTalks])
   useEffect(() => localStorage.setItem(`pocket-budget-check-${todayKey}`, JSON.stringify(budgetChecked)), [budgetChecked])
@@ -192,10 +219,9 @@ export default function App() {
   const categoryInfo = (value: ExpenseCategory) => categories.find(x => x.value === value) ?? categories.at(-1)!
   const talkToDog = () => {
     const lines = [...dialogue[snapshot.stage],
-      ...(foodLevel>0 ? ['배달은 네가 시켰는데 배는 왜 내가 나오지.', '이 배에는 이번 달 식비가 들어 있어.'] : []),
-      ...(shoppingCount>=3 ? ['택배는 네 건데 선글라스는 내 거야.', '나 좀 멋있지. 잔액은 보지 마.'] : []),
-      ...(snapshot.remainingRatio<=.5 ? ['영수증 끝이 안 보이는데. 이거 맞아?', '이거 한 장이야. 이어 붙인 거 아니야.'] : []),
-      ...(foodLevel>0 && shoppingCount>=3 && snapshot.remainingRatio<=.5 ? ['배는 부르고 멋은 챙겼고… 계산은 네가 해.'] : []),
+      ...(foodLevel > 0 ? ['배달은 네가 시켰는데 배는 왜 내가 나오지.', '이 배에는 이번 달 식비가 들어 있어.'] : []),
+      ...(shoppingCount >= 3 ? ['택배는 네 건데 선글라스는 내 거야.', '나 좀 멋있지. 잔액은 보지 마.'] : []),
+      ...(snapshot.remainingRatio <= .5 ? ['영수증 끝이 안 보이는데. 이거 맞아?', '이거 한 장이야. 이어 붙인 거 아니야.'] : []),
     ]
     const candidates = lines.filter(candidate => candidate !== dogLine)
     setDogLine(candidates[Math.floor(Math.random() * candidates.length)] ?? lines[0])
@@ -210,26 +236,6 @@ export default function App() {
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
-  const useDecoration = (item: Decoration) => {
-    const supports = item.slot === 'screen' || item.slot === 'console' ? ['furniture-tv-unit'] : item.slot === 'tabletop' ? ['furniture-side-table'] : []
-    const slotItemIds = new Set(decorations.filter(candidate => candidate.slot === item.slot).map(candidate => candidate.id))
-    const previous = placedDecorations.find(candidate => candidate.slot === item.slot && candidate.id !== item.id)
-    if (!decorationInventory.includes(item.id)) {
-      if (points < item.price) { setMessage(`뼈다귀가 ${item.price - points}개 부족해요.`); return }
-      setPoints(current => current - item.price)
-      setDecorationInventory(current => [...current, item.id])
-      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), ...supports, item.id])
-      setMessage(previous ? `${item.name}을 놓고 ${previous.name}은 소지품에 넣었어요.` : `${item.name}을 구입하고 방에 놓았어요.`)
-      return
-    }
-    if (equippedDecorations.includes(item.id)) {
-      setEquippedDecorations(current => current.filter(id => id !== item.id))
-      setMessage(`${item.name}을 소지품에 넣었어요.`)
-    } else {
-      setEquippedDecorations(current => [...current.filter(id => !slotItemIds.has(id)), ...supports, item.id])
-      setMessage(previous ? `${previous.name} 대신 ${item.name}을 놓았어요.` : `${item.name}을 방에 다시 놓았어요.`)
-    }
-  }
   const moveMonth = (offset: number) => {
     const next = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + offset, 1)
     setViewMonth(next)
@@ -239,9 +245,36 @@ export default function App() {
   return <main className="app-shell">
     <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div><button className="reset" onClick={() => setExpenses([])} disabled={!expenses.length}>이번 달 기록 비우기</button></header>
 
-    <FlatRoom skin={equippedSkin} phase={resolvedTimePhase} selectedPhase={timePhase} onPhase={setTimePhase}
-      items={placedDecorations} food={deliveryPiles} parcels={parcelPileCount} remaining={snapshot.remainingRatio} foodLevel={foodLevel} shoppingCount={shoppingCount}
-      bubble={bubbleVisible} line={dogLine || line} onTalk={talkToDog} onClose={()=>setBubbleVisible(false)} />
+    <section
+      className={`attic stage-${snapshot.stage} time-${resolvedTimePhase} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
+      style={{ '--wear': Math.max(0, 1 - snapshot.remainingRatio) } as CSSProperties}
+      aria-label="강아지의 방"
+    >
+      <img className="room-art" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
+      {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
+      <div className="prop-layer" aria-hidden="true">
+        {deliveryPiles.map((source, index) => (
+          <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />
+        ))}
+        {Array.from({ length: parcelPileCount }, (_, index) => (
+          <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
+        ))}
+      </div>
+      <div className="time-switch" aria-label="방 시간대">
+        {(['auto', 'day', 'sunset', 'night'] as const).map(value => (
+          <button key={value} className={timePhase === value ? 'active' : ''} onClick={() => setTimePhase(value)}>
+            {{ auto: '자동', day: '낮', sunset: '노을', night: '밤' }[value]}
+          </button>
+        ))}
+      </div>
+      <div className="dog-wrap">
+        {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
+        <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
+          <img className="dog-art" src={dogImage} alt={`현재 강아지 상태: ${status}`} />
+        </button>
+        {!bubbleVisible && <span className="talk-hint">강아지를 눌러보세요</span>}
+      </div>
+    </section>
 
     <section className="summary-grid">
       <article><span>월급</span><strong>{won(plan.monthlyIncome)}원</strong></article>
@@ -264,11 +297,14 @@ export default function App() {
         <div className="card-heading"><div><small>SPENDING</small><h2>소비 기록하기</h2></div><span>01</span></div>
         <div className="daily-missions">
           <div className="mission-heading"><b>오늘의 미션</b><span>매일 자정 초기화</span></div>
-          {dailyMissions.map(mission => { const complete = claimedMissions.includes(mission.id); return <div className={`mission ${complete ? 'complete' : ''}`} key={mission.id}>
-            <span className="mission-check">{complete ? '✓' : `${mission.progress}/${mission.goal}`}</span>
-            <p>{mission.title}<small>🦴 {mission.reward}개</small></p>
-            <div><i style={{ width: `${Math.min(100, mission.progress / mission.goal * 100)}%` }} /></div>
-          </div> })}
+          {dailyMissions.map(mission => {
+            const complete = claimedMissions.includes(mission.id)
+            return <div className={`mission ${complete ? 'complete' : ''}`} key={mission.id}>
+              <span className="mission-check">{complete ? '✓' : `${mission.progress}/${mission.goal}`}</span>
+              <p>{mission.title}<small>🦴 {mission.reward}개</small></p>
+              <div><i style={{ width: `${Math.min(100, mission.progress / mission.goal * 100)}%` }} /></div>
+            </div>
+          })}
         </div>
         <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
         <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
@@ -315,24 +351,19 @@ export default function App() {
         {visibleListExpenses.length === 0 ? <p className="empty">조건에 맞는 기록이 없습니다.</p> : <ul>{visibleListExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
       </>}
     </section>
+
     <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>ROOM SHOP</small><h2>방과 소품 꾸미기</h2></div><b>🦴 {points}개</b></div>
-      <p className="shop-guide">방과 소품은 탭에서 따로 고를 수 있어요. 소품은 정해진 자리에 놓이며, 같은 자리의 새 소품을 고르면 자동으로 교체됩니다.</p>
-      <div className="shop-tab-switch"><button className={shopTab === 'room' ? 'active' : ''} onClick={() => setShopTab('room')}>방 스킨</button><button className={shopTab === 'store' ? 'active' : ''} onClick={() => setShopTab('store')}>소품 상점</button><button className={shopTab === 'inventory' ? 'active' : ''} onClick={() => setShopTab('inventory')}>내 아이템</button></div>
-      {shopTab === 'room' ? <><div className="shop-section-title"><div><span>ROOM</span><h3>방 스킨</h3></div><small>한 번에 하나 사용</small></div>
-      <div className="skin-grid">{roomSkins.map(skin => { const owned = inventory.includes(skin.id); const equipped = equippedSkin === skin.id; return <article key={skin.id} className={equipped ? 'equipped' : ''}>
-        <FlatRoom skin={skin.id} phase="day" selectedPhase="day" onPhase={()=>{}} items={defaultRoomSets[skin.id].map(id=>decorations.find(item=>item.id===id)!)} food={[]} parcels={0} remaining={1} foodLevel={0} bubble={false} line="" onTalk={()=>{}} onClose={()=>{}} miniature />
-        <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
-        <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
-      </article> })}</div></> : <><div className="shop-section-title decoration-heading"><div><span>{shopTab === 'store' ? 'STORE' : 'MY ITEMS'}</span><h3>{shopTab === 'store' ? '소품 상점' : '내 아이템'}</h3></div><small>{shopTab === 'store' ? `${decorations.length - decorationInventory.length}개 구매 가능` : `${decorationInventory.length}개 보유`}</small></div>
-      <div className="decoration-filters zone-filters">{decorationZones.map(zone => <button className={decorationZone === zone.value ? 'active' : ''} onClick={() => setDecorationZone(zone.value)} key={zone.value}><span>{zone.emoji}</span>{zone.label}</button>)}</div>
-      <div className="zone-guide"><b>{decorationZones.find(zone => zone.value === decorationZone)?.label}</b><span>이 구역의 자리는 서로 겹치지 않게 고정됩니다.</span></div>
-      <div className="decoration-grid">{decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).map(item => { const owned = decorationInventory.includes(item.id); const equipped = placedDecorations.some(placed => placed.id === item.id); return <article className={equipped ? 'equipped' : ''} key={item.id}>
-        <div className="flat-item-preview"><FlatArt id={item.id}/></div>
-        <div className="decoration-copy"><h3>{item.name}</h3><span className="slot-label">⌖ {decorationSlots[item.slot]}</span><p>{item.description}</p></div>
-        <button onClick={() => useDecoration(item)}>{!owned ? `🦴 ${item.price}개` : equipped ? '방에서 치우기' : '방에 놓기'}</button>
-      </article> })}</div>
-      {decorations.filter(item => slotZones[item.slot] === decorationZone && (shopTab === 'store' ? !decorationInventory.includes(item.id) : decorationInventory.includes(item.id))).length === 0 && <div className="empty-inventory"><span>{shopTab === 'store' ? '✓' : '📦'}</span><b>{shopTab === 'store' ? '이 구역의 소품을 모두 보유 중이에요.' : '이 구역에 보유한 소품이 없어요.'}</b><small>{shopTab === 'store' ? '내 아이템 탭에서 배치할 수 있습니다.' : '소품 상점에서 먼저 구입해보세요.'}</small></div>}</>}
+      <div className="history-title"><div><small>ROOM SHOP</small><h2>방 꾸미기</h2></div><b>🦴 {points}개</b></div>
+      <p className="shop-guide">매일 미션을 완료하면 뼈다귀를 받아요. 구입한 방은 소지품에 남아 언제든 다시 사용할 수 있습니다.</p>
+      <div className="skin-grid">{roomSkins.map(skin => {
+        const owned = inventory.includes(skin.id)
+        const equipped = equippedSkin === skin.id
+        return <article key={skin.id} className={equipped ? 'equipped' : ''}>
+          <img src={skin.image} alt={skin.name} />
+          <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
+          <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
+        </article>
+      })}</div>
     </section>
   </main>
 }
