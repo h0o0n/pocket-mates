@@ -2,20 +2,21 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ff6b35" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#3182F6" />
+    <meta name="msapplication-tap-highlight" content="no" />
     <link rel="icon" href="/assets/ui/favicon.svg" />
-    <title>Pocket Mates — 소비하면 눈치 주는 가계부</title>
+    <title>눈찌</title>
     <meta
       name="description"
-      content="소비 내역에 따라 강아지와 방이 달라지는 게임형 가계부입니다."
+      content="소비 내역에 따라 눈찌와 방이 달라지는 게임형 가계부입니다."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap"
-      rel="stylesheet"
-    />
+    <style>
+      /* 초기 로드 전에도 WebView 탭 하이라이트가 보이지 않게 합니다. */
+      html, body, #root, * {
+        -webkit-tap-highlight-color: transparent !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
