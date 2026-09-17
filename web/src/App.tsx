@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { Button, ListHeader, ListRow, TextField, Top } from '@toss/tds-mobile'
 import { calculateBudget } from './domain/index.ts'
 import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
+import { AuthBar } from './auth/AuthBar.tsx'
+import { useAuth } from './auth/useAuth.ts'
 
 const defaultPlan: BudgetPlan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
 const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }> = [
@@ -119,6 +122,7 @@ const weeksOverlappingMonth = (year: number, month: number) => {
 }
 
 export default function App() {
+  const auth = useAuth()
   const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
   const [plan, setPlan] = useState<BudgetPlan>(() => load('pocket-plan', defaultPlan))
   const [draftPlan, setDraftPlan] = useState(plan)
@@ -420,198 +424,538 @@ export default function App() {
     setSelectedDate(dateKey(next))
   }
 
-  return <main className="app-shell">
-    <header className="topbar"><div><p className="brand">POCKET MATES</p><h1>내 지갑에 얹혀사는 강아지</h1></div></header>
-
-    <section
-      className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
-      style={{ '--wear': Math.max(0, Math.min(1, 1 - snapshot.remainingRatio)) } as CSSProperties}
-      aria-label="강아지의 방"
-    >
-      {/* 방만 살짝 숨쉬게 두고, 강아지는 PNG 그대로 별도 모션 클래스를 씁니다. */}
-      <img className="room-art room-breathe" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
-      {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
-      <div className="prop-layer" aria-hidden="true">
-        {deliveryPiles.map((source, index) => (
-          <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />
-        ))}
-        {Array.from({ length: parcelPileCount }, (_, index) => (
-          <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
-        ))}
-      </div>
-      <div
-        className={`dog-wrap ${dogMotion ? `is-busy motion-${dogMotion}` : `is-wandering ${wander.moving ? 'is-moving' : 'is-idle'}`}`}
-        style={{
-          left: `${wander.left}%`,
-          bottom: `${wander.bottom}%`,
-          transitionDuration: dogMotion ? '0.35s' : `${wander.duration}s`,
-        }}
-      >
-        {bubbleVisible && <button className="speech" onClick={() => setBubbleVisible(false)}>{dogLine || line}<small>눌러서 닫기</small></button>}
-        {/* facing만 뒤집어 걸어 다니고, 말풍선 글자는 뒤집히지 않게 분리합니다. */}
-        <div className="dog-facing" style={{ transform: `scaleX(${wander.facing})` }}>
-          <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
-            <img className="dog-art" src={displayDogImage} alt={`현재 강아지 상태: ${status}${dogMotion === 'eat' && activeSnack ? `, ${activeSnack.label} 먹는 중` : ''}`} />
-          </button>
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <Top
+          title={<Top.TitleParagraph>포켓메이트</Top.TitleParagraph>}
+          subtitleBottom={
+            <Top.SubtitleParagraph size={15}>
+              내 지갑에 얹혀사는 강아지 · {status}
+            </Top.SubtitleParagraph>
+          }
+        />
+        <div className="app-header-auth">
+          <AuthBar
+            configured={auth.configured}
+            status={auth.status}
+            user={auth.user}
+            authMessage={auth.authMessage}
+            authBusy={auth.authBusy}
+            onSignInWithToss={auth.signInWithToss}
+            onSignOut={auth.signOut}
+          />
         </div>
-        {!bubbleVisible && !activeSnack && <span className="talk-hint">강아지를 눌러보세요</span>}
-      </div>
-    </section>
+      </header>
 
-    <section className="summary-grid">
-      <article><span>월급</span><strong>{won(plan.monthlyIncome)}원</strong></article>
-      <article><span>고정비 제외 생활예산</span><strong>{won(snapshot.spendableBudget)}원</strong></article>
-      <article className="remaining"><span>현재 남은 돈</span><strong>{won(snapshot.remainingBalance)}원</strong></article>
-      <article><span>이번 달 사용</span><strong>{won(snapshot.totalSpent)}원</strong></article>
-    </section>
-    <div className="meter"><span style={{ width: `${Math.max(0, Math.min(100, snapshot.remainingRatio * 100))}%` }} /></div>
-    <p className="status-line">{status} · 생활예산의 {Math.max(0, Math.round(snapshot.remainingRatio * 100))}%가 남았어요.</p>
-
-    <nav className="mobile-tabs" aria-label="가계부 메뉴">
-      <button className={activePanel === 'expense' ? 'active' : ''} onClick={() => setActivePanel('expense')}><span>＋</span>소비 기록</button>
-      <button className={activePanel === 'budget' ? 'active' : ''} onClick={() => setActivePanel('budget')}><span>₩</span>예산 설정</button>
-      <button className={activePanel === 'history' ? 'active' : ''} onClick={() => setActivePanel('history')}><span>≡</span>내역 {expenses.length}</button>
-      <button className={activePanel === 'shop' ? 'active' : ''} onClick={() => setActivePanel('shop')}><span>⌂</span>꾸미기</button>
-    </nav>
-
-    <section className="forms-grid">
-      <form className={`paper-card mobile-section ${activePanel === 'expense' ? 'is-active' : ''}`} onSubmit={saveExpense}>
-        <div className="card-heading"><div><small>SPENDING</small><h2>소비 기록하기</h2></div><span>01</span></div>
-        <div className="daily-missions">
-          <div className="mission-heading"><b>오늘의 미션</b><span>매일 자정 초기화</span></div>
-          {dailyMissions.map(mission => {
-            const complete = claimedMissions.includes(mission.id)
-            return <div className={`mission ${complete ? 'complete' : ''}`} key={mission.id}>
-              <span className="mission-check">{complete ? '✓' : `${mission.progress}/${mission.goal}`}</span>
-              <p>{mission.title}<small>🦴 {mission.reward}개</small></p>
-              <div><i style={{ width: `${Math.min(100, mission.progress / mission.goal * 100)}%` }} /></div>
+      <div className="hero-room">
+        <section
+          className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
+          style={{ '--wear': Math.max(0, Math.min(1, 1 - snapshot.remainingRatio)) } as CSSProperties}
+          aria-label="강아지의 방"
+        >
+          <img className="room-art room-breathe" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
+          {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
+          <div className="prop-layer" aria-hidden="true">
+            {deliveryPiles.map((source, index) => (
+              <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />
+            ))}
+            {Array.from({ length: parcelPileCount }, (_, index) => (
+              <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
+            ))}
+          </div>
+          <div
+            className={`dog-wrap ${dogMotion ? `is-busy motion-${dogMotion}` : `is-wandering ${wander.moving ? 'is-moving' : 'is-idle'}`}`}
+            style={{
+              left: `${wander.left}%`,
+              bottom: `${wander.bottom}%`,
+              transitionDuration: dogMotion ? '0.35s' : `${wander.duration}s`,
+            }}
+          >
+            {bubbleVisible && (
+              <button className="speech" onClick={() => setBubbleVisible(false)}>
+                {dogLine || line}
+                <small>눌러서 닫기</small>
+              </button>
+            )}
+            <div className="dog-facing" style={{ transform: `scaleX(${wander.facing})` }}>
+              <button className="dog-button" onClick={talkToDog} aria-label="강아지와 대화하기">
+                <img
+                  className="dog-art"
+                  src={displayDogImage}
+                  alt={`현재 강아지 상태: ${status}${dogMotion === 'eat' && activeSnack ? `, ${activeSnack.label} 먹는 중` : ''}`}
+                />
+              </button>
             </div>
-          })}
-        </div>
-        <label>종류<select value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>{categories.map(x => <option key={x.value} value={x.value}>{x.emoji} {x.label}</option>)}</select></label>
-        <label>어디에 썼나요?<input value={memo} onChange={e => setMemo(e.target.value)} placeholder="예: 친구랑 저녁, 새 게임" maxLength={40} /></label>
-        <label>얼마를 썼나요?<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(amount)} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0"/><span>원</span></div></label>
-        <div className="quick-amounts" aria-label="금액 빠르게 더하기">
-          <button type="button" onClick={() => addQuickAmount(100_000)}>+100,000</button>
-          <button type="button" onClick={() => addQuickAmount(10_000)}>+10,000</button>
-          <button type="button" onClick={() => addQuickAmount(1_000)}>+1,000</button>
-          <button type="button" className="clear-amount" onClick={() => setAmount('')}>초기화</button>
-        </div>
-        <button className="save-button" type="submit">기록하고 강아지에게 알리기</button>
-      </form>
-
-      <form className={`paper-card mobile-section ${activePanel === 'budget' ? 'is-active' : ''}`} onSubmit={savePlan}>
-        <div className="card-heading"><div><small>MONTHLY PLAN</small><h2>이번 달 기준 정하기</h2></div><span>02</span></div>
-        <label>월급<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.monthlyIncome)} onChange={e => updatePlan('monthlyIncome', e.target.value)}/><span>원</span></div></label>
-        <label>매달 나가는 고정비<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.fixedExpenses)} onChange={e => updatePlan('fixedExpenses', e.target.value)}/><span>원</span></div></label>
-        <label>저축 목표<div className="won-input"><input type="text" inputMode="numeric" value={formattedInput(draftPlan.savingsGoal)} onChange={e => updatePlan('savingsGoal', e.target.value)}/><span>원</span></div></label>
-        <button className="save-button secondary" type="submit">이번 달 예산 저장하기</button>
-      </form>
-    </section>
-    {message && <p className="toast" role="status">{message}</p>}
-
-    <section className={`history mobile-section ${activePanel === 'history' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>HISTORY</small><h2>소비 기록</h2></div><b>{expenses.length}건</b></div>
-      <div className="view-switch"><button className={historyView === 'calendar' ? 'active' : ''} onClick={() => setHistoryView('calendar')}>달력으로 보기</button><button className={historyView === 'list' ? 'active' : ''} onClick={() => setHistoryView('list')}>리스트로 보기</button></div>
-      {historyView === 'calendar' ? <>
-        <div className="period-pickers" aria-label="달력 연월 선택">
-          <label>연도
-            <select value={viewMonth.getFullYear()} onChange={event => setCalendarYearMonth(Number(event.target.value), viewMonth.getMonth())}>
-              {listYears.map(year => <option value={year} key={year}>{year}년</option>)}
-            </select>
-          </label>
-          <label>월
-            <select value={viewMonth.getMonth()} onChange={event => setCalendarYearMonth(viewMonth.getFullYear(), Number(event.target.value))}>
-              {Array.from({ length: 12 }, (_, month) => <option value={month} key={month}>{month + 1}월</option>)}
-            </select>
-          </label>
-        </div>
-        <div className="calendar-head"><button onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button><strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong><button onClick={() => moveMonth(1)} aria-label="다음 달">›</button></div>
-        <div className="weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
-        <div className="calendar-grid">{calendarCells.map((day, index) => {
-          if (!day) return <span className="calendar-blank" key={`blank-${index}`} />
-          const key = dateKey(day); const dayExpenses = expensesByDate[key] ?? []; const isSelected = key === selectedDate; const isToday = key === todayKey
-          return <button className={`${isSelected ? 'selected ' : ''}${isToday ? 'today' : ''}`} onClick={() => setSelectedDate(key)} key={key}>
-            <span className="day-number">{day.getDate()}</span>
-            <span className="day-icons">{dayExpenses.slice(0, 3).map(expense => <i key={expense.id}>{categoryInfo(expense.category).emoji}</i>)}{dayExpenses.length > 3 && <small>+{dayExpenses.length - 3}</small>}</span>
-          </button>
-        })}</div>
-        <div className="selected-day-head"><div><b>{selectedBaseDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b><small>{selectedExpenses.length}건</small></div><strong>{won(selectedTotal)}원</strong></div>
-        {selectedExpenses.length === 0 ? <p className="empty">이날은 기록이 없습니다.</p> : <ul>{selectedExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
-      </> : <>
-        <div className="list-filters">
-          <div>{([
-            ['yearly', '연간'],
-            ['monthly', '월간'],
-            ['weekly', '주간'],
-          ] as const).map(([period, label]) => (
-            <button className={listPeriod === period ? 'active' : ''} onClick={() => setListPeriod(period)} key={period}>{label}</button>
-          ))}</div>
-          <select value={listCategory} onChange={event => setListCategory(event.target.value as 'all' | ExpenseCategory)}>
-            <option value="all">전체 유형</option>
-            {categories.map(info => <option value={info.value} key={info.value}>{info.emoji} {info.label}</option>)}
-          </select>
-        </div>
-        <div className="period-pickers" aria-label="조회 기간 선택">
-          <label>연도
-            <select value={listYear} onChange={event => setListYear(Number(event.target.value))}>
-              {listYears.map(year => <option value={year} key={year}>{year}년</option>)}
-            </select>
-          </label>
-          {listPeriod !== 'yearly' && (
-            <label>월
-              <select value={listMonth} onChange={event => setListMonth(Number(event.target.value))}>
-                {Array.from({ length: 12 }, (_, month) => <option value={month} key={month}>{month + 1}월</option>)}
-              </select>
-            </label>
-          )}
-          {listPeriod === 'weekly' && (
-            <label>주간
-              <select value={activeWeek?.key ?? ''} onChange={event => setListWeekKey(event.target.value)}>
-                {listWeeks.map(week => <option value={week.key} key={week.key}>{week.label}</option>)}
-              </select>
-            </label>
-          )}
-        </div>
-        <div className="history-actions">
-          <button className="reset" type="button" onClick={clearPeriodRecords} disabled={!periodExpenses.length}>
-            {listPeriod === 'yearly' ? '선택한 연도 기록 비우기' : listPeriod === 'monthly' ? '선택한 달 기록 비우기' : '선택한 주 기록 비우기'}
-          </button>
-        </div>
-        <div className="category-breakdown">{categoryBreakdown.length ? categoryBreakdown.map(item => <button className={listCategory === item.value ? 'active' : ''} onClick={() => setListCategory(item.value)} key={item.value}><span>{item.emoji}</span><small>{item.label}</small><b>{won(item.total)}원</b></button>) : <p>이 기간에는 기록이 없습니다.</p>}</div>
-        <div className="selected-day-head"><div><b>{periodLabel}</b><small>{visibleListExpenses.length}건 · {listCategory === 'all' ? '전체 유형' : categoryInfo(listCategory).label}</small></div><strong>{won(listTotal)}원</strong></div>
-        {visibleListExpenses.length === 0 ? <p className="empty">조건에 맞는 기록이 없습니다.</p> : <ul>{visibleListExpenses.map(expense => { const info = categoryInfo(expense.category); return <li key={expense.id}><span className="category-icon">{info.emoji}</span><div><b>{expense.memo}</b><small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small></div><strong>-{won(expense.amount)}원</strong><button aria-label={`${expense.memo} 삭제`} onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button></li> })}</ul>}
-      </>}
-    </section>
-
-    <section className={`shop mobile-section ${activePanel === 'shop' ? 'is-active' : ''}`}>
-      <div className="history-title"><div><small>ROOM SHOP</small><h2>꾸미기</h2></div><b>🦴 {points}개</b></div>
-      <p className="shop-guide">방 스킨과 강아지 옷을 뼈다귀로 살 수 있어요. 가구 소품은 아직 바꾸지 않습니다.</p>
-      <div className="view-switch shop-tabs">
-        <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')}>방 스킨</button>
-        <button className={shopTab === 'outfits' ? 'active' : ''} onClick={() => setShopTab('outfits')}>강아지 옷</button>
+            {!bubbleVisible && !activeSnack && <span className="talk-hint">강아지를 눌러보세요</span>}
+          </div>
+        </section>
       </div>
-      {shopTab === 'rooms' ? (
-        <div className="skin-grid">{roomSkins.map(skin => {
-          const owned = inventory.includes(skin.id)
-          const equipped = equippedSkin === skin.id
-          return <article key={skin.id} className={equipped ? 'equipped' : ''}>
-            <img src={skin.image} alt={skin.name} />
-            <div><h3>{skin.name}</h3><p>{skin.description}</p></div>
-            <button onClick={() => useSkin(skin)} disabled={equipped}>{equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}</button>
-          </article>
-        })}</div>
-      ) : (
-        <div className="skin-grid outfit-grid">{dogOutfits.map(outfit => {
-          const owned = outfitInventory.includes(outfit.id)
-          const equipped = equippedOutfit === outfit.id
-          return <article key={outfit.id} className={equipped ? 'equipped' : ''}>
-            <img src={outfit.image ?? '/assets/characters/states/dog-neutral.png'} alt={outfit.name} />
-            <div><h3>{outfit.name}</h3><p>{outfit.description}</p></div>
-            <button onClick={() => useOutfit(outfit)} disabled={equipped}>{equipped ? '착용 중' : owned ? '입히기' : `🦴 ${outfit.price}개`}</button>
-          </article>
-        })}</div>
+
+      <section className="summary-panel" aria-label="예산 요약">
+        <ListRow
+          contents={<ListRow.Texts type="2RowTypeA" top="월급" bottom={`${won(plan.monthlyIncome)}원`} />}
+          verticalPadding="small"
+        />
+        <ListRow
+          contents={<ListRow.Texts type="2RowTypeA" top="생활예산" bottom={`${won(snapshot.spendableBudget)}원`} />}
+          verticalPadding="small"
+        />
+        <ListRow
+          contents={<ListRow.Texts type="2RowTypeA" top="남은 돈" bottom={`${won(snapshot.remainingBalance)}원`} />}
+          verticalPadding="small"
+        />
+        <ListRow
+          contents={<ListRow.Texts type="2RowTypeA" top="이번 달 사용" bottom={`${won(snapshot.totalSpent)}원`} />}
+          verticalPadding="small"
+          border="none"
+        />
+        <div className="meter">
+          <span style={{ width: `${Math.max(0, Math.min(100, snapshot.remainingRatio * 100))}%` }} />
+        </div>
+        <p className="status-line">
+          {status} · 생활예산의 {Math.max(0, Math.round(snapshot.remainingRatio * 100))}%가 남았어요.
+        </p>
+      </section>
+
+      {activePanel === 'expense' && (
+        <section className="panel-card">
+          <ListHeader title={<ListHeader.TitleParagraph>소비 기록</ListHeader.TitleParagraph>} />
+          <form className="panel-body" onSubmit={saveExpense}>
+            <div className="mission-box">
+              <div className="mission-heading">
+                <b>오늘의 미션</b>
+                <span>매일 자정에 초기화돼요</span>
+              </div>
+              {dailyMissions.map(mission => {
+                const complete = claimedMissions.includes(mission.id)
+                return (
+                  <div className={`mission ${complete ? 'complete' : ''}`} key={mission.id}>
+                    <span className="mission-check">{complete ? '✓' : `${mission.progress}/${mission.goal}`}</span>
+                    <p>
+                      {mission.title}
+                      <small>🦴 {mission.reward}개</small>
+                    </p>
+                    <div>
+                      <i style={{ width: `${Math.min(100, (mission.progress / mission.goal) * 100)}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <label className="field-label">
+              종류
+              <select className="native-select" value={category} onChange={e => setCategory(e.target.value as ExpenseCategory)}>
+                {categories.map(x => (
+                  <option key={x.value} value={x.value}>
+                    {x.emoji} {x.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <TextField
+              variant="box"
+              label="어디에 썼나요?"
+              labelOption="sustain"
+              value={memo}
+              onChange={event => setMemo(event.target.value)}
+              placeholder="예: 친구랑 저녁"
+              maxLength={40}
+            />
+            <TextField
+              variant="box"
+              label="얼마를 썼나요?"
+              labelOption="sustain"
+              inputMode="numeric"
+              value={formattedInput(amount)}
+              onChange={event => setAmount(event.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="0"
+              suffix="원"
+            />
+            <div className="quick-amounts" aria-label="금액 빠르게 더하기">
+              <button type="button" onClick={() => addQuickAmount(100_000)}>+10만</button>
+              <button type="button" onClick={() => addQuickAmount(10_000)}>+1만</button>
+              <button type="button" onClick={() => addQuickAmount(1_000)}>+1천</button>
+              <button type="button" className="clear-amount" onClick={() => setAmount('')}>초기화</button>
+            </div>
+            <Button type="submit" display="block" size="large" color="primary">
+              기록하기
+            </Button>
+          </form>
+        </section>
       )}
-    </section>
-  </main>
+
+      {activePanel === 'budget' && (
+        <section className="panel-card">
+          <ListHeader title={<ListHeader.TitleParagraph>예산 설정</ListHeader.TitleParagraph>} />
+          <form className="panel-body" onSubmit={savePlan}>
+            <TextField
+              variant="box"
+              label="월급"
+              labelOption="sustain"
+              inputMode="numeric"
+              value={formattedInput(draftPlan.monthlyIncome)}
+              onChange={event => updatePlan('monthlyIncome', event.target.value)}
+              suffix="원"
+            />
+            <TextField
+              variant="box"
+              label="매달 나가는 고정비"
+              labelOption="sustain"
+              inputMode="numeric"
+              value={formattedInput(draftPlan.fixedExpenses)}
+              onChange={event => updatePlan('fixedExpenses', event.target.value)}
+              suffix="원"
+            />
+            <TextField
+              variant="box"
+              label="저축 목표"
+              labelOption="sustain"
+              inputMode="numeric"
+              value={formattedInput(draftPlan.savingsGoal)}
+              onChange={event => updatePlan('savingsGoal', event.target.value)}
+              suffix="원"
+            />
+            <Button type="submit" display="block" size="large" color="primary">
+              예산 저장하기
+            </Button>
+          </form>
+        </section>
+      )}
+
+      {activePanel === 'history' && (
+        <section className="panel-card">
+          <ListHeader
+            title={<ListHeader.TitleParagraph>소비 내역</ListHeader.TitleParagraph>}
+            right={<ListHeader.RightText>{expenses.length}건</ListHeader.RightText>}
+          />
+          <div className="segment">
+            <button className={historyView === 'calendar' ? 'active' : ''} onClick={() => setHistoryView('calendar')} type="button">
+              달력
+            </button>
+            <button className={historyView === 'list' ? 'active' : ''} onClick={() => setHistoryView('list')} type="button">
+              리스트
+            </button>
+          </div>
+
+          {historyView === 'calendar' ? (
+            <>
+              <div className="period-pickers" aria-label="달력 연월 선택">
+                <label>
+                  연도
+                  <select className="native-select" value={viewMonth.getFullYear()} onChange={event => setCalendarYearMonth(Number(event.target.value), viewMonth.getMonth())}>
+                    {listYears.map(year => (
+                      <option value={year} key={year}>{year}년</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  월
+                  <select className="native-select" value={viewMonth.getMonth()} onChange={event => setCalendarYearMonth(viewMonth.getFullYear(), Number(event.target.value))}>
+                    {Array.from({ length: 12 }, (_, month) => (
+                      <option value={month} key={month}>{month + 1}월</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="calendar-head">
+                <button onClick={() => moveMonth(-1)} aria-label="이전 달" type="button">‹</button>
+                <strong>{viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월</strong>
+                <button onClick={() => moveMonth(1)} aria-label="다음 달" type="button">›</button>
+              </div>
+              <div className="weekdays">
+                <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+              </div>
+              <div className="calendar-grid">
+                {calendarCells.map((day, index) => {
+                  if (!day) return <span className="calendar-blank" key={`blank-${index}`} />
+                  const key = dateKey(day)
+                  const dayExpenses = expensesByDate[key] ?? []
+                  const isSelected = key === selectedDate
+                  const isToday = key === todayKey
+                  return (
+                    <button
+                      className={`${isSelected ? 'selected ' : ''}${isToday ? 'today' : ''}`}
+                      onClick={() => setSelectedDate(key)}
+                      key={key}
+                      type="button"
+                    >
+                      <span className="day-number">{day.getDate()}</span>
+                      <span className="day-icons">
+                        {dayExpenses.slice(0, 3).map(expense => (
+                          <i key={expense.id}>{categoryInfo(expense.category).emoji}</i>
+                        ))}
+                        {dayExpenses.length > 3 && <small>+{dayExpenses.length - 3}</small>}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="day-summary">
+                <div>
+                  <b>{selectedBaseDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</b>
+                  <small>{selectedExpenses.length}건</small>
+                </div>
+                <strong>{won(selectedTotal)}원</strong>
+              </div>
+              {selectedExpenses.length === 0 ? (
+                <p className="empty">이날은 기록이 없어요.</p>
+              ) : (
+                <ul className="expense-list">
+                  {selectedExpenses.map(expense => {
+                    const info = categoryInfo(expense.category)
+                    return (
+                      <li key={expense.id}>
+                        <span className="category-icon">{info.emoji}</span>
+                        <div>
+                          <b>{expense.memo}</b>
+                          <small>{info.label}</small>
+                        </div>
+                        <strong>-{won(expense.amount)}원</strong>
+                        <button
+                          aria-label={`${expense.memo} 삭제`}
+                          type="button"
+                          onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="segment three">
+                {([
+                  ['yearly', '연간'],
+                  ['monthly', '월간'],
+                  ['weekly', '주간'],
+                ] as const).map(([period, label]) => (
+                  <button
+                    className={listPeriod === period ? 'active' : ''}
+                    onClick={() => setListPeriod(period)}
+                    key={period}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="period-pickers" aria-label="조회 기간 선택">
+                <label>
+                  연도
+                  <select className="native-select" value={listYear} onChange={event => setListYear(Number(event.target.value))}>
+                    {listYears.map(year => (
+                      <option value={year} key={year}>{year}년</option>
+                    ))}
+                  </select>
+                </label>
+                {listPeriod !== 'yearly' && (
+                  <label>
+                    월
+                    <select className="native-select" value={listMonth} onChange={event => setListMonth(Number(event.target.value))}>
+                      {Array.from({ length: 12 }, (_, month) => (
+                        <option value={month} key={month}>{month + 1}월</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+              {listPeriod === 'weekly' && (
+                <div className="period-pickers full">
+                  <label>
+                    주간
+                    <select className="native-select" value={activeWeek?.key ?? ''} onChange={event => setListWeekKey(event.target.value)}>
+                      {listWeeks.map(week => (
+                        <option value={week.key} key={week.key}>{week.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+              <div className="period-pickers full">
+                <label>
+                  유형
+                  <select
+                    className="native-select"
+                    value={listCategory}
+                    onChange={event => setListCategory(event.target.value as 'all' | ExpenseCategory)}
+                  >
+                    <option value="all">전체 유형</option>
+                    {categories.map(info => (
+                      <option value={info.value} key={info.value}>
+                        {info.emoji} {info.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="action-row">
+                <Button
+                  display="block"
+                  size="medium"
+                  color="dark"
+                  variant="weak"
+                  disabled={!periodExpenses.length}
+                  onClick={clearPeriodRecords}
+                >
+                  {listPeriod === 'yearly' ? '선택한 연도 기록 비우기' : listPeriod === 'monthly' ? '선택한 달 기록 비우기' : '선택한 주 기록 비우기'}
+                </Button>
+              </div>
+              <div className="category-breakdown">
+                {categoryBreakdown.length ? (
+                  categoryBreakdown.map(item => (
+                    <button
+                      className={listCategory === item.value ? 'active' : ''}
+                      onClick={() => setListCategory(item.value)}
+                      key={item.value}
+                      type="button"
+                    >
+                      <span>{item.emoji}</span>
+                      <small>{item.label}</small>
+                      <b>{won(item.total)}원</b>
+                    </button>
+                  ))
+                ) : (
+                  <p>이 기간에는 기록이 없어요.</p>
+                )}
+              </div>
+              <div className="day-summary">
+                <div>
+                  <b>{periodLabel}</b>
+                  <small>
+                    {visibleListExpenses.length}건 · {listCategory === 'all' ? '전체 유형' : categoryInfo(listCategory).label}
+                  </small>
+                </div>
+                <strong>{won(listTotal)}원</strong>
+              </div>
+              {visibleListExpenses.length === 0 ? (
+                <p className="empty">조건에 맞는 기록이 없어요.</p>
+              ) : (
+                <ul className="expense-list">
+                  {visibleListExpenses.map(expense => {
+                    const info = categoryInfo(expense.category)
+                    return (
+                      <li key={expense.id}>
+                        <span className="category-icon">{info.emoji}</span>
+                        <div>
+                          <b>{expense.memo}</b>
+                          <small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small>
+                        </div>
+                        <strong>-{won(expense.amount)}원</strong>
+                        <button
+                          aria-label={`${expense.memo} 삭제`}
+                          type="button"
+                          onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {activePanel === 'shop' && (
+        <section className="panel-card">
+          <ListHeader
+            title={<ListHeader.TitleParagraph>꾸미기</ListHeader.TitleParagraph>}
+            right={<ListHeader.RightText>🦴 {points}개</ListHeader.RightText>}
+          />
+          <p className="shop-guide">방 스킨과 강아지 옷을 뼈다귀로 살 수 있어요.</p>
+          <div className="segment">
+            <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')} type="button">
+              방 스킨
+            </button>
+            <button className={shopTab === 'outfits' ? 'active' : ''} onClick={() => setShopTab('outfits')} type="button">
+              강아지 옷
+            </button>
+          </div>
+          {shopTab === 'rooms' ? (
+            <div className="skin-grid">
+              {roomSkins.map(skin => {
+                const owned = inventory.includes(skin.id)
+                const equipped = equippedSkin === skin.id
+                return (
+                  <article key={skin.id} className={equipped ? 'equipped' : ''}>
+                    <img src={skin.image} alt={skin.name} />
+                    <div>
+                      <h3>{skin.name}</h3>
+                      <p>{skin.description}</p>
+                    </div>
+                    <Button
+                      className="skin-cta"
+                      display="block"
+                      size="small"
+                      color={equipped ? 'dark' : 'primary'}
+                      variant={equipped ? 'weak' : 'fill'}
+                      disabled={equipped}
+                      onClick={() => useSkin(skin)}
+                    >
+                      {equipped ? '사용 중' : owned ? '사용하기' : `🦴 ${skin.price}개`}
+                    </Button>
+                  </article>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="skin-grid outfit-grid">
+              {dogOutfits.map(outfit => {
+                const owned = outfitInventory.includes(outfit.id)
+                const equipped = equippedOutfit === outfit.id
+                return (
+                  <article key={outfit.id} className={equipped ? 'equipped' : ''}>
+                    <img src={outfit.image ?? '/assets/characters/states/dog-neutral.png'} alt={outfit.name} />
+                    <div>
+                      <h3>{outfit.name}</h3>
+                      <p>{outfit.description}</p>
+                    </div>
+                    <Button
+                      className="skin-cta"
+                      display="block"
+                      size="small"
+                      color={equipped ? 'dark' : 'primary'}
+                      variant={equipped ? 'weak' : 'fill'}
+                      disabled={equipped}
+                      onClick={() => useOutfit(outfit)}
+                    >
+                      {equipped ? '착용 중' : owned ? '입히기' : `🦴 ${outfit.price}개`}
+                    </Button>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {message && (
+        <p className="toast" role="status">
+          {message}
+        </p>
+      )}
+
+      <nav className="floating-tab" aria-label="가계부 메뉴">
+        <button className={activePanel === 'expense' ? 'active' : ''} onClick={() => setActivePanel('expense')} type="button">
+          <span>＋</span>기록
+        </button>
+        <button className={activePanel === 'budget' ? 'active' : ''} onClick={() => setActivePanel('budget')} type="button">
+          <span>₩</span>예산
+        </button>
+        <button className={activePanel === 'history' ? 'active' : ''} onClick={() => setActivePanel('history')} type="button">
+          <span>≡</span>내역
+        </button>
+        <button className={activePanel === 'shop' ? 'active' : ''} onClick={() => setActivePanel('shop')} type="button">
+          <span>⌂</span>꾸미기
+        </button>
+      </nav>
+    </main>
+  )
 }
+

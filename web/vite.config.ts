@@ -1,6 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import aitDevtools from "@apps-in-toss/devtools/unplugin";
 
+/**
+ * 앱인토스 WebView 배포용 Vite 설정
+ * - base './': 상대 경로로 정적 자산을 불러와 미니앱 번들에서 깨지지 않게 합니다.
+ * - aitDevtools: 로컬 브라우저에서 토스 SDK(로그인 등)를 모킹합니다.
+ */
 export default defineConfig({
-  plugins: [react()],
+  base: "./",
+  plugins: [aitDevtools.vite(), react()],
 });

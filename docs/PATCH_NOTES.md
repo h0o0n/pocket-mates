@@ -1,4 +1,20 @@
 # Pocket Mates 개발 패치노트
+## v2.4.0 - 토스/TDS 전면 UI
+
+- TDS(`@toss/tds-mobile`) + `TDSMobileAITProvider`로 전 화면을 토스앱 톤에 맞게 재구성했습니다.
+- 브랜드 컬러 `#3182F6`는 유지했습니다.
+- 상단 `Top`/`ListHeader`/`ListRow`/`TextField`/`Button`, 하단 플로팅 탭바를 적용했습니다.
+- 방·강아지 연출은 유지하고, 크림/수첩 스타일 배경·폰트는 제거했습니다.
+
+## v2.3.0 - 앱인토스 배포 준비·토스 로그인
+
+- Supabase 매직링크 로그인을 제거하고 **토스 로그인(`TossAuth.login`)** 으로 교체했습니다.
+- 비게임 검수 가이드에 맞게 이메일/자사 로그인 UI를 제공하지 않습니다.
+- `apps-in-toss.config.ts`를 SDK 3.x 형식(`webBundleDir: web/dist`, `webView`)으로 수정했습니다.
+- Vite에 `base: './'`와 AIT Devtools 플러그인을 추가했습니다.
+- web 패키지 React를 18로 맞추고 `@apps-in-toss/web-framework`를 web 의존성에 추가했습니다.
+- AccessToken 교환용 파트너 서버(mTLS)는 아직 없으며, 로그인 성공 세션만 Storage/localStorage에 유지합니다.
+
 ## v2.2.0 - 소비 소품의 생활감과 트리 비율 수정
 
 - 배달용기에 뚜껑·종이 띠·컵 홀더를 추가하고, 택배는 윗면·테이프·송장·열린 상자로 표현합니다.
@@ -42,6 +58,20 @@
 | 저장 방식 | 도메인 로직 우선 | 현재 화면 데이터는 로컬 저장, Supabase 스키마는 준비 | 일부 구현 |
 | 배포 | Vercel 사용 | Vite 빌드와 Vercel 설정 구성 | 구현 |
 | 랭킹·경쟁 | 데이터베이스 사용 시 검토 | 1차 개발 범위에서 제외 | 보류 |
+
+## v0.7.5 — 매직링크 로그인 (2026-09-17)
+
+### 추가
+
+- Supabase 이메일 **매직링크** 로그인
+- 같은 기기/브라우저에서는 세션을 localStorage에 유지
+- 상단에서 로그인·로그아웃 가능 (가계부 클라우드 동기화는 아직 없음)
+
+### 대시보드 설정
+
+1. Authentication → Providers → Email 활성화
+2. Authentication → URL Configuration → Redirect URLs에 배포 주소 추가  
+   예: `https://your-app.vercel.app`, `http://localhost:5173`
 
 ## v0.7.4 — 기록 기간 선택·강아지 옷 (2026-09-16)
 

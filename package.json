@@ -5,11 +5,23 @@
   "description": "소비에 따라 캐릭터가 반응하는 게임형 가계부",
   "scripts": {
     "dev": "npm run dev --prefix web",
-    "build": "npm run build --prefix web",
+    "build": "npm run build --prefix web && ait build",
     "test": "npm run test:logic --prefix web",
-    "preview": "npm run preview --prefix web"
+    "preview": "npm run preview --prefix web",
+    "deploy": "ait deploy"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@apps-in-toss/web-framework": "^3.4.1",
+    "@emotion/react": "^11.14.0",
+    "@toss/tds-mobile": "^2.5.1",
+    "@toss/tds-mobile-ait": "^2.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@apps-in-toss/devtools": "^3.4.1"
   }
 }

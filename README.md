@@ -1,34 +1,32 @@
-# Wallet Mates
+# Pocket Mates (`pocket-mates`)
 
-소비 내역에 따라 캐릭터의 표정과 생활 공간이 달라지는 게임형 가계부입니다.
+소비 내역에 따라 캐릭터의 표정과 생활 공간이 달라지는 게임형 가계부 미니앱입니다.
 
-현재는 UI보다 핵심 도메인 로직을 먼저 개발하고 있습니다.
-
-## 준비된 로직
-
-- 월급, 고정지출, 저축 목표를 이용한 사용 가능 예산 계산
-- 소비 합계, 남은 잔액, 초과 지출 계산
-- 잔액 비율에 따른 캐릭터 상태 판정
-- 소비 카테고리와 반복 횟수에 따른 반응 문구
-- 입력값 검증
+앱인토스 `appName`: **pocket-mates**
 
 ## 실행
 
 ```bash
+npm install
 npm install --prefix web
 npm test
 npm run dev
 ```
 
-## 배포 빌드
+로컬에서는 AIT Devtools로 토스 로그인 등을 모킹할 수 있습니다.
+
+## 앱인토스 빌드·배포
 
 ```bash
-npm run build
+npm run build   # web 빌드 + ait build → pocket-mates.ait
+npm run deploy  # 콘솔 API 키 필요: npx ait deploy --api-key ...
 ```
 
-Vercel은 루트의 `vercel.json` 설정을 사용합니다.
+로그인: **토스 로그인** (`TossAuth.login`).  
+AccessToken 교환은 파트너 서버 mTLS가 필요하며, 현재는 로그인 성공 세션만 클라이언트에 유지합니다.
 
-Supabase 테이블과 RLS 정책은 `supabase/schema.sql`에 있습니다.
+Supabase는 DB 동기화용으로 남겨 두었고, Supabase Auth(매직링크)는 사용하지 않습니다.  
+테이블/RLS: `supabase/schema.sql`
 
 ## 프로젝트 문서
 
