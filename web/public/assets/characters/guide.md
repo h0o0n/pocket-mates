@@ -182,6 +182,9 @@ hop/nod/walk는 CSS 공용. idle만 만들고 끝내지 말 것.
 | `subscriber` | 월스티 | `companions/subscriber/` | 라벤더 스카프 조각 |
 
 각 폴더에 `dog-neutral|chubby|very-chubby|receipt|eating.png` 5장 필수.  
-배경은 맨몸과 같이 **솔리드 블랙** (앱에서 투명 처리).  
+배경은 맨몸과 같이 **완전 투명 RGBA**. 검정·흰색 배경을 넣거나 앱에서 색상 키로 지우지 않습니다.  
+체커보드가 보이는 편집기 화면을 이미지로 저장하거나, 검정 배경 PNG를 투명 처리한 결과물을 사용하지 않습니다.  
+외곽선은 원본 그대로 보존하며 누끼 잔상을 가리기 위해 검은 선을 굵게 덧칠하지 않습니다.  
+최종 파일은 밝은 배경과 어두운 배경에 각각 합성해 흰 테두리·검은 번짐·체커 조각이 없는지 확인합니다.  
 코드: `CompanionId`, `companionDogStates`, 온보딩 설문 → `spendingType` / `companionId` 저장.  
-자세한 규칙은 `companions/guide.md` 참고.
+**새 동물을 만들거나 누끼를 수정하기 전에 반드시 `companions/guide.md`를 먼저 읽습니다.**
