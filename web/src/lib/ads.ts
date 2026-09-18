@@ -14,3 +14,13 @@ export const BANNER_AD_GROUP_ID =
 
 /** 광고 1회 시청 완료 시 지급할 냠 */
 export const REWARD_NYAM_PER_AD = 100
+
+/** 하루 리워드 광고 최대 시청 횟수 */
+export const REWARD_AD_DAILY_LIMIT = 3
+
+/** 리워드 광고 연속 시청 사이 최소 간격 (ms) */
+export const REWARD_AD_COOLDOWN_MS = 5_000
+
+/** 남은 쿨다운을 초 단위로 (0이면 시청 가능). */
+export const rewardAdCooldownRemainingSec = (lastWatchedAtMs: number, nowMs = Date.now()) =>
+  Math.max(0, Math.ceil((lastWatchedAtMs + REWARD_AD_COOLDOWN_MS - nowMs) / 1000))

@@ -34,6 +34,27 @@ export const getCompanionStage = (remainingRatio: number): CompanionStage => {
   return 'speechless'
 }
 
+/** 로컬 달력 기준 연·월이 같은지 비교 (월급 주기 = 이번 달). */
+export const isSameCalendarMonth = (
+  left: Date | string,
+  right: Date | string,
+): boolean => {
+  const a = typeof left === 'string' ? new Date(left) : left
+  const b = typeof right === 'string' ? new Date(right) : right
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+}
+
+/** 기준일이 속한 달의 지출만 남긴다. 기본 기준일은 오늘. */
+export const filterExpensesByMonth = (
+  expenses: readonly Expense[],
+  reference: Date | string = new Date(),
+): Expense[] =>
+  expenses.filter((expense) => isSameCalendarMonth(expense.spentAt, reference))
+
+/**
+ * 넘겨받은 지출 목록을 그대로 합산한다.
+ * 월 예산이 필요하면 호출 전에 filterExpensesByMonth 하거나 calculateMonthlyBudget을 쓴다.
+ */
 export const calculateBudget = (
   plan: BudgetPlan,
   expenses: readonly Expense[],
@@ -56,3 +77,10 @@ export const calculateBudget = (
     stage: getCompanionStage(remainingRatio),
   }
 }
+
+/** 월 생활예산 대비, 기준 달 지출만으로 잔액·캐릭터 stage를 계산한다. */
+export const calculateMonthlyBudget = (
+  plan: BudgetPlan,
+  expenses: readonly Expense[],
+  reference: Date | string = new Date(),
+): BudgetSnapshot => calculateBudget(plan, filterExpensesByMonth(expenses, reference))

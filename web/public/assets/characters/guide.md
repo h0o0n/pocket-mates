@@ -168,3 +168,20 @@ type DogVisualState = 'neutral' | 'chubby' | 'very-chubby' | 'receipt' | 'eating
 **옷 1벌 = 맨몸과 동일한 5상태 PNG 전부.**  
 만들 때는 **원본 눈찌의 테두리와 얼굴을 그대로 보존**하고 옷만 입힌다.  
 hop/nod/walk는 CSS 공용. idle만 만들고 끝내지 말 것.
+
+---
+
+## 7. 소비 유형 컴패니언 (companions/)
+
+눈찌 가족 메이트 3종. DNA·포즈 5장은 맨몸과 동일하고, 아주 작은 악센트만 다릅니다.
+
+| CompanionId | 이름 | 폴더 | 악센트 |
+|-------------|------|------|--------|
+| `foodie` | 밥찌 | `companions/foodie/` | 따뜻한 크림 + 작은 냅킨/턱받이 |
+| `shopper` | 장찌 | `companions/shopper/` | 작은 택배 상자 |
+| `subscriber` | 월스티 | `companions/subscriber/` | 라벤더 스카프 조각 |
+
+각 폴더에 `dog-neutral|chubby|very-chubby|receipt|eating.png` 5장 필수.  
+배경은 맨몸과 같이 **솔리드 블랙** (앱에서 투명 처리).  
+코드: `CompanionId`, `companionDogStates`, 온보딩 설문 → `spendingType` / `companionId` 저장.  
+자세한 규칙은 `companions/guide.md` 참고.

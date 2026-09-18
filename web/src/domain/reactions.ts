@@ -1,4 +1,4 @@
-import { calculateBudget } from './budget.ts'
+import { calculateBudget, filterExpensesByMonth } from './budget.ts'
 import type {
   BudgetPlan,
   Expense,
@@ -39,9 +39,13 @@ export const createExpenseReaction = (
   previousExpenses: readonly Expense[],
   newExpense: Expense,
 ): ExpenseReaction => {
-  const expenses = [...previousExpenses, newExpense]
-  const snapshot = calculateBudget(plan, expenses)
-  const categoryCount = expenses.filter(
+  // 잔액 stage·카테고리 반복 멘트는 '새 지출이 속한 달' 기준으로만 본다.
+  const monthExpenses = filterExpensesByMonth(
+    [...previousExpenses, newExpense],
+    newExpense.spentAt,
+  )
+  const snapshot = calculateBudget(plan, monthExpenses)
+  const categoryCount = monthExpenses.filter(
     (expense) => expense.category === newExpense.category,
   ).length
 
