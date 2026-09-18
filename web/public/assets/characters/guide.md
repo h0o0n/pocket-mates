@@ -175,13 +175,14 @@ hop/nod/walk는 CSS 공용. idle만 만들고 끝내지 말 것.
 
 눈찌 가족 메이트 3종. DNA·포즈 5장은 맨몸과 동일하고, 아주 작은 악센트만 다릅니다.
 
-| CompanionId | 이름 | 폴더 | 악센트 |
-|-------------|------|------|--------|
-| `foodie` | 밥찌 | `companions/foodie/` | 따뜻한 크림 + 작은 냅킨/턱받이 |
-| `shopper` | 장찌 | `companions/shopper/` | 작은 택배 상자 |
-| `subscriber` | 월스티 | `companions/subscriber/` | 라벤더 스카프 조각 |
+| CompanionId | 동물 | 폴더 | 파일 접두사 | 악센트 |
+|-------------|------|------|-------------|--------|
+| `foodie` | 곰 | `companions/foodie/` | `bear-` | 따뜻한 크림 + 작은 냅킨/턱받이 |
+| `shopper` | 너구리 | `companions/shopper/` | `raccoon-` | 작은 택배 상자 |
+| `subscriber` | 물개 | `companions/subscriber/` | `seal-` | 라벤더 스카프 조각 |
 
-각 폴더에 `dog-neutral|chubby|very-chubby|receipt|eating.png` 5장 필수.  
+각 폴더에 `{동물}-neutral|chubby|very-chubby|receipt|eating.png` 5장 필수.  
+(기본 잔액지킴이/강아지는 `states/dog-*.png` — companions 폴더가 아님)  
 배경은 맨몸과 같이 **완전 투명 RGBA**. 검정·흰색 배경을 넣거나 앱에서 색상 키로 지우지 않습니다.  
 체커보드가 보이는 편집기 화면을 이미지로 저장하거나, 검정 배경 PNG를 투명 처리한 결과물을 사용하지 않습니다.  
 외곽선은 원본 그대로 보존하며 누끼 잔상을 가리기 위해 검은 선을 굵게 덧칠하지 않습니다.  

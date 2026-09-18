@@ -19,7 +19,9 @@
 ### 1. 상태와 파일 규격
 
 - 각 동물은 `neutral`, `chubby`, `very-chubby`, `receipt`, `eating` 5상태를 모두 준비합니다.
-- 파일명은 `dog-neutral.png`, `dog-chubby.png`, `dog-very-chubby.png`, `dog-receipt.png`, `dog-eating.png`로 고정합니다.
+- 파일명은 **동물 영문 접두사** + 상태입니다. 예: `bear-neutral.png`, `raccoon-chubby.png`, `seal-receipt.png`.
+- 접두사 매핑: `foodie`→`bear`, `shopper`→`raccoon`, `subscriber`→`seal`, `_archive/capybara`→`capybara`.
+- 상태 5종: `neutral`, `chubby`, `very-chubby`, `receipt`, `eating`.
 - 현재 컴패니언 캔버스는 상태별로 모두 `1024×1024`입니다. 임의로 확대·축소하거나 비율을 변경하지 않습니다.
 - 포즈와 소품은 눈찌의 같은 상태를 기준으로 맞추되, 동물의 얼굴과 실루엣은 상태 사이에서 동일하게 유지합니다.
 

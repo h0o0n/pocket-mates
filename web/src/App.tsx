@@ -83,14 +83,24 @@ const baseDogStates: Record<DogVisualState, string> = {
   eating: '/assets/characters/states/dog-eating.png',
 }
 
-/** 소비 유형 컴패니언 5상태 경로 (companions/{id}/) */
-const companionDogStates = (id: SpendingType): Record<DogVisualState, string> => ({
-  neutral: `/assets/characters/companions/${id}/dog-neutral.png`,
-  chubby: `/assets/characters/companions/${id}/dog-chubby.png`,
-  'very-chubby': `/assets/characters/companions/${id}/dog-very-chubby.png`,
-  receipt: `/assets/characters/companions/${id}/dog-receipt.png`,
-  eating: `/assets/characters/companions/${id}/dog-eating.png`,
-})
+/** 소비 유형 id → 동물 영문 접두사 (파일명과 동일) */
+const COMPANION_ANIMAL_PREFIX: Record<SpendingType, string> = {
+  foodie: 'bear',
+  shopper: 'raccoon',
+  subscriber: 'seal',
+}
+
+/** 소비 유형 컴패니언 5상태 경로 (companions/{id}/{animal}-*.png) */
+const companionDogStates = (id: SpendingType): Record<DogVisualState, string> => {
+  const animal = COMPANION_ANIMAL_PREFIX[id]
+  return {
+    neutral: `/assets/characters/companions/${id}/${animal}-neutral.png`,
+    chubby: `/assets/characters/companions/${id}/${animal}-chubby.png`,
+    'very-chubby': `/assets/characters/companions/${id}/${animal}-very-chubby.png`,
+    receipt: `/assets/characters/companions/${id}/${animal}-receipt.png`,
+    eating: `/assets/characters/companions/${id}/${animal}-eating.png`,
+  }
+}
 
 /** 컴패니언 메타 — 이름(유저) + 칭호(유형 역할) */
 const companions: Array<{
