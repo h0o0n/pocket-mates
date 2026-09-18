@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework'
 import { Button, BottomSheet, ListHeader, ListRow, TextField } from '@toss/tds-mobile'
+import { TDSMobileAITProvider } from '@toss/tds-mobile-ait'
 import { calculateMonthlyBudget, createExpenseReaction, filterExpensesByMonth } from './domain/index.ts'
 import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
 import {
@@ -61,6 +62,17 @@ type SpendingType = Exclude<CompanionId, 'nunchi'>
 type DogVisualState = 'neutral' | 'chubby' | 'very-chubby' | 'receipt' | 'eating'
 type ListPeriod = 'weekly' | 'monthly' | 'yearly'
 type OnboardingStep = 'survey' | 'result' | 'name'
+/** 전체 UI 파스텔 테마 (버튼·탭·강조색 포함) */
+type ThemeId = 'pink' | 'mint' | 'sky'
+
+const THEME_OPTIONS: Array<{ id: ThemeId; label: string; primary: string }> = [
+  { id: 'pink', label: '핑크', primary: '#E891B8' },
+  { id: 'mint', label: '연두', primary: '#7CB896' },
+  { id: 'sky', label: '하늘', primary: '#7EB8E8' },
+]
+
+const isThemeId = (value: unknown): value is ThemeId =>
+  value === 'pink' || value === 'mint' || value === 'sky'
 
 /** 맨몸 상태 경로 — 기본 눈찌 / 옷 없을 때 */
 const baseDogStates: Record<DogVisualState, string> = {
@@ -122,8 +134,34 @@ const companions: Array<{
 const DEFAULT_COMPANION_NAME = '눈찌'
 const COMPANION_NAME_MAX = 8
 
+/**
+ * 설문으로 고른 눈찌 외 해금 가격.
+ * 리워드 광고 일일 한도(3회×100냠) × 7일 ≈ 일주일 모으면 살 수 있는 분량.
+ */
+const COMPANION_UNLOCK_PRICE = REWARD_NYAM_PER_AD * REWARD_AD_DAILY_LIMIT * 7
+
 /** 화면용: {이름} · {칭호} */
 const nunchiCallsign = (name: string, title: string) => `${name} · ${title}`
+
+/**
+ * 보유 눈찌 목록 로드.
+ * - 기본 눈찌(잔액지킴이/강아지)는 항상 지급
+ * - 설문·구매로 얻은 유형도 합침
+ */
+const loadOwnedCompanions = (
+  k: (suffix: string) => string,
+): CompanionId[] => {
+  const seed = new Set<CompanionId>(['nunchi'])
+  const saved = loadJson<CompanionId[] | null>(k('owned-companions'), null)
+  if (Array.isArray(saved)) {
+    for (const id of saved) seed.add(id)
+  }
+  const current = loadJson<CompanionId>(k('companion-id'), 'nunchi')
+  seed.add(current)
+  const survey = loadJson<SpendingType | null>(k('spending-type'), null)
+  if (survey) seed.add(survey)
+  return [...seed]
+}
 
 /** 온보딩 이름 — 비우면 눈찌, 앞뒤 공백 제거·길이 제한 */
 const normalizeCompanionName = (raw: string) => {
@@ -131,49 +169,98 @@ const normalizeCompanionName = (raw: string) => {
   return trimmed || DEFAULT_COMPANION_NAME
 }
 
-/** 온보딩 설문 — 3문항 × 3선택, 다수결(동점 → foodie) */
+/**
+ * 온보딩 설문 — 심리테스트형 6문항 × 3선택.
+ * 배달/외식만 눈에 띄지 않게, 기분·습관·충동 질문으로 유형을 고르게 분산.
+ */
 const onboardingQuestions: Array<{
   id: string
   prompt: string
   options: Array<{ label: string; type: SpendingType }>
 }> = [
   {
-    id: 'weekend',
-    prompt: '주말에 지갑이 제일 먼저 열리는 순간은?',
+    id: 'comfort',
+    prompt: '힘든 하루의 끝을 스스로 위로하는 방식은?',
     options: [
-      { label: '배달 앱을 켠다', type: 'foodie' },
-      { label: '장바구니를 결제한다', type: 'shopper' },
-      { label: '새 구독·멤버십을 본다', type: 'subscriber' },
+      { label: '따뜻한 걸로 배를 채운다', type: 'foodie' },
+      { label: '사고 싶던 걸 장바구니에 담는다', type: 'shopper' },
+      { label: '조용한 콘텐츠·앱에 빠진다', type: 'subscriber' },
     ],
   },
   {
-    id: 'regret',
-    prompt: '다음 달 카드 명세에서 제일 뜨끔한 줄은?',
+    id: 'impulse',
+    prompt: '“이번만…” 하며 가장 자주 무너지는 순간은?',
     options: [
-      { label: '치킨·카페·외식 합계', type: 'foodie' },
-      { label: '택배·패션·생활용품', type: 'shopper' },
-      { label: 'OTT·음악·클라우드 구독', type: 'subscriber' },
+      { label: '배고픈데 요리하기 싫을 때', type: 'foodie' },
+      { label: '할인·무료배송 타이머가 돌 때', type: 'shopper' },
+      { label: '무료 체험이 끝나기 직전일 때', type: 'subscriber' },
     ],
   },
   {
     id: 'joy',
-    prompt: '행복이 충전되는 알림음은?',
+    prompt: '알림이 울렸을 때 제일 설레는 문구는?',
     options: [
-      { label: '배달 출발했어요', type: 'foodie' },
-      { label: '택배가 도착했어요', type: 'shopper' },
-      { label: '구독이 갱신됐어요', type: 'subscriber' },
+      { label: '곧 도착해요 / 픽업 준비됐어요', type: 'foodie' },
+      { label: '택배가 배송을 시작했어요', type: 'shopper' },
+      { label: '이번 달에도 이용 중이에요', type: 'subscriber' },
+    ],
+  },
+  {
+    id: 'weekend',
+    prompt: '주말에 남는 에너지가 있다면 어디에 쓰나요?',
+    options: [
+      { label: '맛집·카페·야식 코스 짜기', type: 'foodie' },
+      { label: '서랍·옷장·방을 새로 꾸미기', type: 'shopper' },
+      { label: '밀린 시리즈·플레이리스트 정주행', type: 'subscriber' },
+    ],
+  },
+  {
+    id: 'regret',
+    prompt: '카드 명세를 보며 “또…” 하는 항목은?',
+    options: [
+      { label: '외식·카페·간식 합계', type: 'foodie' },
+      { label: '생활용품·패션·소품', type: 'shopper' },
+      { label: '기억도 안 나는 자동결제', type: 'subscriber' },
+    ],
+  },
+  {
+    id: 'personality',
+    prompt: '친구들이 말하는 나의 소비 캐릭터는?',
+    options: [
+      { label: '배고프면 이성이 잠시 꺼져요', type: 'foodie' },
+      { label: '소유욕이 힐링이에요', type: 'shopper' },
+      { label: '한 번 켜두면 잘 안 끄죠', type: 'subscriber' },
     ],
   },
 ]
 
-/** 설문 답안 배열 → 다수결 소비 유형 (동점이면 foodie / 심야출출대장) */
+/**
+ * 설문으로 만날 수 있는 눈찌만 (기본 잔액지킴이/강아지 제외).
+ * 설문 결과·해금은 이 목록에만 해당합니다.
+ */
+const surveyCompanions = companions.filter(
+  (mate): mate is typeof companions[number] & { id: SpendingType } => mate.spendingType != null,
+)
+
+/**
+ * 설문 답안 → 다수결 소비 유형.
+ * 동점이면 처음에 고른 유형을 우선 (직감 쪽) — foodie로 몰지 않음.
+ * 기본 눈찌(nunchi)는 절대 반환하지 않음.
+ */
 const scoreSpendingType = (answers: SpendingType[]): SpendingType => {
   const tallies: Record<SpendingType, number> = { foodie: 0, shopper: 0, subscriber: 0 }
-  for (const answer of answers) tallies[answer] += 1
+  for (const answer of answers) {
+    if (answer === 'foodie' || answer === 'shopper' || answer === 'subscriber') {
+      tallies[answer] += 1
+    }
+  }
   const max = Math.max(tallies.foodie, tallies.shopper, tallies.subscriber)
   const winners = (Object.keys(tallies) as SpendingType[]).filter(type => tallies[type] === max)
-  // 동점이면 심야출출대장(foodie)으로 고정
-  return winners.length === 1 ? winners[0]! : 'foodie'
+  if (winners.length === 1) return winners[0]!
+  for (const answer of answers) {
+    if (winners.includes(answer)) return answer
+  }
+  return 'shopper'
 }
 
 /** 옷 1벌의 상태 5장 경로 (characters/guide.md 규칙) */
@@ -626,14 +713,24 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [companionName, setCompanionName] = useState(() => (
     loadJson(k('companion-name'), DEFAULT_COMPANION_NAME)
   ))
+  // 설문은 강제 오버레이가 아니라, 유저가 열 때만 표시 (스킵·닫기 가능)
+  const [ownedCompanions, setOwnedCompanions] = useState<CompanionId[]>(() => loadOwnedCompanions(k))
+  const [surveyOpen, setSurveyOpen] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('survey')
   const [surveyIndex, setSurveyIndex] = useState(0)
   const [surveyAnswers, setSurveyAnswers] = useState<SpendingType[]>([])
   const [nameDraft, setNameDraft] = useState(DEFAULT_COMPANION_NAME)
+  // 전체 UI 테마 (버튼·탭·강조색). 기본 하늘 파스텔.
+  const [themeId, setThemeId] = useState<ThemeId>(() => {
+    const saved = loadJson<unknown>(k('ui-theme'), 'sky')
+    return isThemeId(saved) ? saved : 'sky'
+  })
   // 리워드 광고: 로드 완료 후에만 시청 가능 + 일일 한도/쿨다운
   const [rewardAdReady, setRewardAdReady] = useState(false)
   const [rewardAdBusy, setRewardAdBusy] = useState(false)
   const [rewardAdSupported, setRewardAdSupported] = useState(true)
+  // 꾸미기: 리워드 loaded(또는 실패) 후에만 배너 attach — Android 동시 로드 누락 방지
+  const [shopBannerEnabled, setShopBannerEnabled] = useState(false)
   const [rewardAdsToday, setRewardAdsToday] = useState(() => (
     loadJson(k(`reward-ads-${period.todayKey}`), 0)
   ))
@@ -649,6 +746,11 @@ function PocketApp({ userHash }: { userHash: string }) {
   const snackTimer = useRef(0)
   const nudgeTimer = useRef(0)
   const nudgeHideTimer = useRef(0)
+  // 리워드 시청 중 플래그 — Android 일부 버전은 dismissed가 안 와서 busy가 남을 수 있음
+  const rewardCycleOpenRef = useRef(false)
+  const rewardAdShownRef = useRef(false)
+  const rewardBusySafetyTimer = useRef(0)
+  const endRewardAdCycleRef = useRef<() => void>(() => {})
   const dogAreaRef = useRef<HTMLDivElement | null>(null)
   const bubbleVisibleRef = useRef(bubbleVisible)
   const bubbleKindRef = useRef<'nudge' | 'talk'>('talk')
@@ -784,7 +886,9 @@ function PocketApp({ userHash }: { userHash: string }) {
   const surveyResultType = surveyAnswers.length === onboardingQuestions.length
     ? scoreSpendingType(surveyAnswers)
     : spendingType
-  const resultCompanion = companions.find(item => item.id === (surveyResultType ?? 'foodie')) ?? companions[1]
+  // 설문 결과는 유형 눈찌만 (기본 강아지 제외)
+  const resultCompanion = surveyCompanions.find(item => item.id === (surveyResultType ?? 'foodie'))
+    ?? surveyCompanions[0]!
 
   useEffect(() => saveJson(k('plan'), plan), [plan, userHash])
   useEffect(() => saveJson(k('expenses'), expenses), [expenses, userHash])
@@ -797,6 +901,12 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('spending-type'), spendingType), [spendingType, userHash])
   useEffect(() => saveJson(k('companion-id'), companionId), [companionId, userHash])
   useEffect(() => saveJson(k('companion-name'), companionName), [companionName, userHash])
+  useEffect(() => saveJson(k('owned-companions'), ownedCompanions), [ownedCompanions, userHash])
+  useEffect(() => saveJson(k('ui-theme'), themeId), [themeId, userHash])
+  // 탭·FAB·칩 CSS 변수 + TDS 버튼(brandPrimaryColor)이 같은 테마를 쓰도록 html에 반영
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeId)
+  }, [themeId])
   useEffect(() => saveJson(k(`talks-${todayKey}`), dailyTalks), [dailyTalks, userHash, todayKey])
   useEffect(() => saveJson(k(`talks-week-${weekKey}`), weeklyTalks), [weeklyTalks, userHash, weekKey])
   useEffect(() => saveJson(k(`budget-check-${monthKey}`), budgetChecked), [budgetChecked, userHash, monthKey])
@@ -861,24 +971,35 @@ function PocketApp({ userHash }: { userHash: string }) {
     }
   }, [expenseSheetOpen])
 
-  // 꾸미기 탭에 있을 때 리워드 광고를 미리 로드합니다. (load → show → load)
+  // 꾸미기 탭: 리워드 먼저 로드 → 완료/실패 후 배너 허용 (load → show → load)
   useEffect(() => {
-    if (activePanel !== 'shop') return
+    if (activePanel !== 'shop') {
+      setShopBannerEnabled(false)
+      return
+    }
     if (!loadFullScreenAd.isSupported() || !showFullScreenAd.isSupported()) {
       setRewardAdSupported(false)
       setRewardAdReady(false)
+      // 리워드 미지원이면 배너만 단독 attach
+      setShopBannerEnabled(true)
       return
     }
     setRewardAdSupported(true)
     setRewardAdReady(false)
+    setShopBannerEnabled(false)
 
     const unregister = loadFullScreenAd({
       options: { adGroupId: REWARDED_AD_GROUP_ID },
       onEvent: event => {
-        if (event.type === 'loaded') setRewardAdReady(true)
+        if (event.type === 'loaded') {
+          setRewardAdReady(true)
+          setShopBannerEnabled(true)
+        }
       },
       onError: () => {
         setRewardAdReady(false)
+        // 리워드 실패해도 배너는 붙일 수 있게 게이트 오픈
+        setShopBannerEnabled(true)
         setMessage('광고를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
       },
     })
@@ -888,6 +1009,57 @@ function PocketApp({ userHash }: { userHash: string }) {
     }
   }, [activePanel])
 
+  /** 시청 후 다음 리워드 프리로드 — 배너를 잠시 내린 뒤 로드해 동시 호출을 피함 */
+  const preloadNextRewardedAd = () => {
+    if (!loadFullScreenAd.isSupported()) {
+      setRewardAdReady(false)
+      setShopBannerEnabled(true)
+      return
+    }
+    setShopBannerEnabled(false)
+    setRewardAdReady(false)
+    loadFullScreenAd({
+      options: { adGroupId: REWARDED_AD_GROUP_ID },
+      onEvent: next => {
+        if (next.type === 'loaded') {
+          setRewardAdReady(true)
+          setShopBannerEnabled(true)
+        }
+      },
+      onError: () => {
+        setRewardAdReady(false)
+        setShopBannerEnabled(true)
+      },
+    })
+  }
+
+  /**
+   * 리워드 표시 사이클 종료.
+   * dismissed 누락(Android 일부)·복귀·안전 타이머에서 공통으로 호출해 busy 고착을 막음.
+   */
+  const endRewardAdCycle = () => {
+    if (!rewardCycleOpenRef.current) return
+    rewardCycleOpenRef.current = false
+    rewardAdShownRef.current = false
+    window.clearTimeout(rewardBusySafetyTimer.current)
+    setRewardAdBusy(false)
+    preloadNextRewardedAd()
+  }
+  endRewardAdCycleRef.current = endRewardAdCycle
+
+  // 광고 닫힌 뒤 WebView로 복귀했는데 dismissed가 없으면 busy 해제
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!rewardCycleOpenRef.current || !rewardAdShownRef.current) return
+      endRewardAdCycleRef.current()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.clearTimeout(rewardBusySafetyTimer.current)
+    }
+  }, [])
   useEffect(() => {
     bubbleVisibleRef.current = bubbleVisible
   }, [bubbleVisible])
@@ -1208,6 +1380,23 @@ function PocketApp({ userHash }: { userHash: string }) {
     setMessage(`${outfit.name}을(를) 구입하고 바로 착용했어요.`)
   }
 
+  /** 설문 모달 열기 — 처음부터 다시 */
+  const openSurvey = () => {
+    setSurveyIndex(0)
+    setSurveyAnswers([])
+    setOnboardingStep('survey')
+    setNameDraft(companionName)
+    setSurveyOpen(true)
+  }
+
+  /** 설문 닫기(나중에) — 진행 중 답도 버리고 홈/샵으로 */
+  const closeSurvey = () => {
+    setSurveyOpen(false)
+    setSurveyIndex(0)
+    setSurveyAnswers([])
+    setOnboardingStep('survey')
+  }
+
   /** 설문 칩 선택 → 다음 문항 또는 결과 */
   const answerSurvey = (type: SpendingType) => {
     const nextAnswers = [...surveyAnswers, type]
@@ -1221,32 +1410,63 @@ function PocketApp({ userHash }: { userHash: string }) {
 
   /** 결과에서 이름 짓기 단계로 */
   const goToNameStep = () => {
-    setNameDraft(DEFAULT_COMPANION_NAME)
+    setNameDraft(companionName || DEFAULT_COMPANION_NAME)
     setOnboardingStep('name')
   }
 
-  /** 이름 확정 + 유형·컴패니언 저장 후 홈으로 */
+  /**
+   * 설문 완료 — 기본 눈찌(강아지)는 설문으로 고르지 않음.
+   * 결과 유형(곰/너구리/물개)만 해금·착용. 기본 눈찌는 계속 보유만 유지.
+   */
   const finishOnboarding = () => {
     const type = scoreSpendingType(surveyAnswers)
+    // 방어: 설문 경로로는 nunchi가 올 수 없음
+    if (type !== 'foodie' && type !== 'shopper' && type !== 'subscriber') {
+      setMessage('설문으로는 유형 눈찌만 만날 수 있어요.')
+      return
+    }
     const name = normalizeCompanionName(nameDraft)
+    const title = surveyCompanions.find(item => item.id === type)?.title ?? ''
     setSpendingType(type)
     setCompanionId(type)
     setCompanionName(name)
-    // 설문 결과 눈찌가 강아지가 아니면 코스튬 해제
-    if (type !== 'nunchi') setEquippedOutfit('none')
+    setOwnedCompanions(current => [...new Set<CompanionId>(['nunchi', ...current, type])])
+    setEquippedOutfit('none')
     setOnboardingDone(true)
-    setMessage(`${name}와 함께 시작해요.`)
+    setSurveyOpen(false)
+    setMessage(`${nunchiCallsign(name, title)}(으)로 바꿨어요.`)
   }
 
-  /** 꾸미기에서 눈찌 유형 교체 — 유저 이름은 유지, 칭호만 바뀜 */
-  const equipCompanion = (id: CompanionId) => {
-    setCompanionId(id)
-    // 강아지가 아니면 코스튬 상태맵을 쓰지 않으므로 맨몸(none)으로 맞춤
-    if (id !== 'nunchi' && equippedOutfit !== 'none') {
-      setEquippedOutfit('none')
-    }
+  /**
+   * 꾸미기에서 눈찌 착용/구매.
+   * - 보유: 바로 교체 (이름 유지, 칭호만 변경)
+   * - 미보유: COMPANION_UNLOCK_PRICE 차감 후 해금·착용
+   */
+  const useCompanion = (id: CompanionId) => {
     const mate = companions.find(item => item.id === id) ?? companions[0]
-    setMessage(`${nunchiCallsign(companionName, mate.title)}(으)로 바꿨어요.`)
+    const applyEquip = () => {
+      setCompanionId(id)
+      // 강아지가 아니면 코스튬 상태맵을 쓰지 않으므로 맨몸(none)으로 맞춤
+      if (id !== 'nunchi' && equippedOutfit !== 'none') {
+        setEquippedOutfit('none')
+      }
+    }
+
+    if (ownedCompanions.includes(id)) {
+      applyEquip()
+      setMessage(`${nunchiCallsign(companionName, mate.title)}(으)로 바꿨어요.`)
+      return
+    }
+
+    if (points < COMPANION_UNLOCK_PRICE) {
+      setMessage(`다른 눈찌는 ${COMPANION_UNLOCK_PRICE}냠이 필요해요. ${COMPANION_UNLOCK_PRICE - points}냠이 부족해요.`)
+      return
+    }
+
+    setPoints(current => current - COMPANION_UNLOCK_PRICE)
+    setOwnedCompanions(current => (current.includes(id) ? current : [...current, id]))
+    applyEquip()
+    setMessage(`${nunchiCallsign(companionName, mate.title)}을(를) 데려왔어요.`)
   }
 
   /** 리워드 광고를 끝까지 보면 100냠을 지급합니다. (userEarnedReward에서만) */
@@ -1273,10 +1493,21 @@ function PocketApp({ userHash }: { userHash: string }) {
       setMessage('광고를 준비하고 있어요. 잠시만요.')
       return
     }
+    rewardCycleOpenRef.current = true
+    rewardAdShownRef.current = false
     setRewardAdBusy(true)
+    // dismissed 미수신 대비 안전망 (최대 2분)
+    window.clearTimeout(rewardBusySafetyTimer.current)
+    rewardBusySafetyTimer.current = window.setTimeout(() => {
+      endRewardAdCycleRef.current()
+    }, 120_000)
+
     showFullScreenAd({
       options: { adGroupId: REWARDED_AD_GROUP_ID },
       onEvent: event => {
+        if (event.type === 'show' || event.type === 'impression') {
+          rewardAdShownRef.current = true
+        }
         if (event.type === 'userEarnedReward') {
           // 제품 정책: 1광고 = 100냠 (클릭/닫기만으로는 지급하지 않음)
           const watchedAt = Date.now()
@@ -1287,22 +1518,16 @@ function PocketApp({ userHash }: { userHash: string }) {
           setMessage(`광고 시청 완료! ${REWARD_NYAM_PER_AD}냠을 받았어요 🍪`)
         }
         if (event.type === 'dismissed' || event.type === 'failedToShow') {
-          setRewardAdBusy(false)
-          setRewardAdReady(false)
-          if (loadFullScreenAd.isSupported()) {
-            loadFullScreenAd({
-              options: { adGroupId: REWARDED_AD_GROUP_ID },
-              onEvent: next => {
-                if (next.type === 'loaded') setRewardAdReady(true)
-              },
-              onError: () => setRewardAdReady(false),
-            })
-          }
+          endRewardAdCycle()
         }
       },
       onError: () => {
+        rewardCycleOpenRef.current = false
+        rewardAdShownRef.current = false
+        window.clearTimeout(rewardBusySafetyTimer.current)
         setRewardAdBusy(false)
         setRewardAdReady(false)
+        setShopBannerEnabled(true)
         setMessage('광고를 열지 못했어요. 다시 시도해 주세요.')
       },
     })
@@ -1325,7 +1550,14 @@ function PocketApp({ userHash }: { userHash: string }) {
     setSelectedDate(dateKey(next))
   }
 
+  const themePrimary = THEME_OPTIONS.find(item => item.id === themeId)?.primary ?? '#7EB8E8'
+  const selectTheme = (id: ThemeId) => {
+    setThemeId(id)
+    setMessage(`${THEME_OPTIONS.find(item => item.id === id)?.label ?? ''} 테마로 바꿨어요.`)
+  }
+
   return (
+    <TDSMobileAITProvider brandPrimaryColor={themePrimary}>
     <main className="app-shell">
       <div className="hero-room">
         <section
@@ -1386,16 +1618,26 @@ function PocketApp({ userHash }: { userHash: string }) {
         </section>
       </div>
 
-      {!onboardingDone && (
+      {surveyOpen && (
         <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="소비 유형 설문">
           <div className="onboarding-card">
+            <button
+              type="button"
+              className="onboarding-close"
+              onClick={closeSurvey}
+              aria-label="설문 닫기"
+            >
+              나중에
+            </button>
             {onboardingStep === 'survey' && (
               <>
                 <p className="onboarding-kicker">
-                  눈찌 찾기 · {surveyIndex + 1}/{onboardingQuestions.length}
+                  소비 심리 테스트 · {surveyIndex + 1}/{onboardingQuestions.length}
                 </p>
                 <h2 className="onboarding-title">{onboardingQuestions[surveyIndex].prompt}</h2>
-                <p className="onboarding-sub">가볍게 골라 주세요. 정답은 없어요.</p>
+                <p className="onboarding-sub">
+                  설문으로는 곰·너구리·물개만 만나요. 잔액지킴이(강아지)는 기본이라 여기서 고르지 않아요.
+                </p>
                 <div className="onboarding-chips" role="group" aria-label="선택지">
                   {onboardingQuestions[surveyIndex].options.map(option => (
                     <button
@@ -1421,7 +1663,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                 <h2 className="onboarding-title">눈찌 · {resultCompanion.title}</h2>
                 <p className="onboarding-sub">{resultCompanion.tagline}</p>
                 <Button display="block" size="large" color="primary" onClick={goToNameStep}>
-                  이름 정하기
+                  이 눈찌로 바꾸기
                 </Button>
               </>
             )}
@@ -1433,8 +1675,8 @@ function PocketApp({ userHash }: { userHash: string }) {
                   src={resultCompanion.states.neutral}
                   alt=""
                 />
-                <h2 className="onboarding-title">이름을 붙여 주세요</h2>
-                <p className="onboarding-sub">비워 두면 눈찌로 시작해요. 나중에 바꿀 수도 있어요.</p>
+                <h2 className="onboarding-title">이름을 확인해 주세요</h2>
+                <p className="onboarding-sub">비워 두면 눈찌로 불러요. 꾸미기에서 언제든 바꿀 수 있어요.</p>
                 <div className="onboarding-name-field">
                   <TextField
                     variant="box"
@@ -1448,7 +1690,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                   <p className="onboarding-name-hint">{nameDraft.trim().length}/{COMPANION_NAME_MAX}</p>
                 </div>
                 <Button display="block" size="large" color="primary" onClick={finishOnboarding}>
-                  {normalizeCompanionName(nameDraft)}와 시작
+                  {normalizeCompanionName(nameDraft)} · {resultCompanion.title}로
                 </Button>
               </>
             )}
@@ -1843,6 +2085,25 @@ function PocketApp({ userHash }: { userHash: string }) {
             {spendingType ? ` (설문 ${companions.find(item => item.id === spendingType)?.title})` : ''}
             . 방·코스튬·눈찌를 바꿀 수 있어요.
           </p>
+          <div className="panel-body theme-section">
+            <p className="expense-section-label">UI 색상</p>
+            <div className="theme-picker" role="radiogroup" aria-label="UI 테마 색상">
+              {THEME_OPTIONS.map(theme => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={themeId === theme.id}
+                  className={`theme-swatch ${themeId === theme.id ? 'is-active' : ''}`}
+                  onClick={() => selectTheme(theme.id)}
+                >
+                  <i className={`theme-swatch-dot is-${theme.id}`} aria-hidden="true" />
+                  <span>{theme.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="theme-picker-hint">버튼·탭·강조색 등 앱 전체 UI 색을 바꿉니다.</p>
+          </div>
           <div className="segment three">
             <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')} type="button">
               방 스킨
@@ -1935,15 +2196,50 @@ function PocketApp({ userHash }: { userHash: string }) {
                   maxLength={COMPANION_NAME_MAX}
                 />
               </div>
+              <p className="shop-lock-hint">
+                <b>잔액지킴이(강아지)</b>는 기본 지급이라 설문으로 고르지 않아요.
+                {!onboardingDone
+                  ? ' 설문은 곰·너구리·물개 유형만 만나요.'
+                  : ' 다른 유형 눈찌는 약 일주일치 '}
+                {onboardingDone && (
+                  <>
+                    <b><NyamAmount amount={COMPANION_UNLOCK_PRICE} /></b>을 모으면 데려올 수 있어요.
+                  </>
+                )}
+              </p>
+              {!onboardingDone && (
+                <div className="survey-cta-wrap">
+                  <Button display="block" size="medium" color="primary" onClick={openSurvey}>
+                    소비 유형 테스트하고 눈찌 바꾸기
+                  </Button>
+                </div>
+              )}
+              {onboardingDone && (
+                <div className="survey-cta-wrap">
+                  <Button display="block" size="medium" color="dark" variant="weak" onClick={openSurvey}>
+                    유형 테스트 다시 하기
+                  </Button>
+                </div>
+              )}
               <div className="skin-grid outfit-grid">
                 {companions.map(mate => {
                   const equipped = companionId === mate.id
+                  const owned = ownedCompanions.includes(mate.id)
                   return (
-                    <article key={mate.id} className={equipped ? 'equipped' : ''}>
+                    <article
+                      key={mate.id}
+                      className={[equipped ? 'equipped' : '', !owned ? 'is-locked' : ''].filter(Boolean).join(' ')}
+                    >
                       <img src={mate.states.neutral} alt={nunchiCallsign(companionName, mate.title)} />
                       <div>
                         <h3>{nunchiCallsign(companionName, mate.title)}</h3>
-                        <p>{mate.tagline}</p>
+                        <p>
+                          {mate.id === 'nunchi'
+                            ? '기본 눈찌 · 언제든 함께할 수 있어요.'
+                            : owned
+                              ? mate.tagline
+                              : '아직 만나지 못한 눈찌예요.'}
+                        </p>
                       </div>
                       <Button
                         className="skin-cta"
@@ -1952,9 +2248,13 @@ function PocketApp({ userHash }: { userHash: string }) {
                         color={equipped ? 'dark' : 'primary'}
                         variant={equipped ? 'weak' : 'fill'}
                         disabled={equipped}
-                        onClick={() => equipCompanion(mate.id)}
+                        onClick={() => useCompanion(mate.id)}
                       >
-                        {equipped ? '함께 중' : '이 눈찌로'}
+                        {equipped
+                          ? '함께 중'
+                          : owned
+                            ? '이 눈찌로'
+                            : <NyamAmount amount={COMPANION_UNLOCK_PRICE} />}
                       </Button>
                     </article>
                   )
@@ -1963,7 +2263,8 @@ function PocketApp({ userHash }: { userHash: string }) {
             </>
           )}
           {/* 꾸미기: 상품 목록 아래 배너 (상단 리워드 CTA와 분리) */}
-          <BannerAdSlot slotId="shop-list" />
+          {/* 리워드 loaded/실패 후에만 마운트 — Android 배너·리워드 동시 로드 누락 방지 */}
+          {shopBannerEnabled ? <BannerAdSlot slotId="shop-list" /> : null}
         </section>
       )}
 
@@ -2170,6 +2471,7 @@ function PocketApp({ userHash }: { userHash: string }) {
         </button>
       </nav>
     </main>
+    </TDSMobileAITProvider>
   )
 }
 

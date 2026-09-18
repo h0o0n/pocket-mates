@@ -1,17 +1,45 @@
-/* Pocket Mates — 토스(TDS) 톤 UI. 방·강아지 연출 CSS는 하단에 유지합니다. */
-:root {
-  --pm-blue: #3182f6;
-  --pm-bg: #f2f4f6;
+/* Pocket Mates ???�스???�마. data-theme ?�로 ?�환?�니?? */
+:root,
+[data-theme='sky'] {
+  --pm-blue: #7eb8e8;
+  --pm-accent-light: #a8d4f5;
+  --pm-tint: #eef6fc;
+  --pm-tint-line: #cfe6f7;
+  --pm-bg: #f3f8fc;
   --pm-surface: #ffffff;
-  --pm-text: #191f28;
-  --pm-text-sub: #8b95a1;
-  --pm-line: #e5e8eb;
+  --pm-text: #1a2332;
+  --pm-text-sub: #7a8b9c;
+  --pm-line: #e2ebf2;
   --pm-safe-bottom: env(safe-area-inset-bottom, 0px);
   color: var(--pm-text);
   background: var(--pm-bg);
   font-family: "Toss Product Sans", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+}
+
+[data-theme='pink'] {
+  --pm-blue: #e891b8;
+  --pm-accent-light: #f3b4d0;
+  --pm-tint: #fdf2f7;
+  --pm-tint-line: #f5d0e3;
+  --pm-bg: #fdf6f9;
+  --pm-surface: #ffffff;
+  --pm-text: #2a1f28;
+  --pm-text-sub: #9a8490;
+  --pm-line: #f0e2e8;
+}
+
+[data-theme='mint'] {
+  --pm-blue: #7cb896;
+  --pm-accent-light: #a3d4b6;
+  --pm-tint: #eef8f1;
+  --pm-tint-line: #cce8d6;
+  --pm-bg: #f4faf6;
+  --pm-surface: #ffffff;
+  --pm-text: #1e2a22;
+  --pm-text-sub: #7a8f82;
+  --pm-line: #dde8e1;
 }
 
 * {
@@ -24,12 +52,15 @@
 }
 html,
 body {
-  /* 모바일/토스 WebView 탭 시 주황·회색 하이라이트 제거 */
+  /* 모바???�스 WebView ????주황·?�색 ?�이?�이???�거 */
   -webkit-tap-highlight-color: transparent !important;
   -webkit-touch-callout: none;
+  /* 비게??가?�드: 지?????��??��?·축소 비활??*/
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
 }
-/* 창(window) 스크롤을 막고, 실제 스크롤은 .app-shell에서만 합니다.
-   BottomSheet 스크롤락이 body에 top:-scrollY를 넣을 때 메인이 통째로 튀는 현상 방지 */
+/* �?window) ?�크롤을 막고, ?�제 ?�크롤�? .app-shell?�서�??�니??
+   BottomSheet ?�크롤락??body??top:-scrollY�??�을 ??메인???�째�??�???�상 방�? */
 html,
 body,
 #root {
@@ -97,7 +128,7 @@ button:active {
   scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
 }
-/* 시트 열린 동안 배경 스크롤·바운스 차단 (스크롤 위치는 JS로 유지) */
+/* ?�트 ?�린 ?�안 배경 ?�크롤·바?�스 차단 (?�크�??�치??JS�??��?) */
 body.is-expense-sheet-open .app-shell {
   overflow: hidden;
 }
@@ -109,7 +140,7 @@ body.is-expense-sheet-open .app-shell {
 }
 
 .hero-room {
-  /* 페이지 배경과 동일 — 방 카드만 떠 보이게 */
+  /* ?�이지 배경�??�일 ??�?카드�???보이�?*/
   background: var(--pm-bg);
   padding: 12px 16px 0;
 }
@@ -204,7 +235,7 @@ body.is-expense-sheet-open .app-shell {
   cursor: pointer;
 }
 .quick-amounts button:active {
-  background: #eef4ff;
+  background: var(--pm-tint);
   border-color: #c9dcff;
 }
 .quick-amounts .clear-amount {
@@ -399,7 +430,7 @@ body.is-expense-sheet-open .app-shell {
 }
 .calendar-grid > button.selected {
   border-color: var(--pm-blue);
-  background: #eef4ff;
+  background: var(--pm-tint);
 }
 .calendar-grid > button.today .day-number {
   display: grid;
@@ -496,7 +527,7 @@ body.is-expense-sheet-open .app-shell {
 }
 .category-breakdown button.active {
   border-color: var(--pm-blue);
-  background: #eef4ff;
+  background: var(--pm-tint);
 }
 .category-breakdown button span { font-size: 18px; }
 .category-breakdown button small { color: var(--pm-text-sub); font-size: 11px; }
@@ -592,17 +623,20 @@ body.is-expense-sheet-open .app-shell {
   color: var(--pm-text);
   font-weight: 700;
 }
+.survey-cta-wrap {
+  margin: 0 0 12px;
+}
 .outfit-grid article.is-locked {
   opacity: 0.55;
 }
 
-/* 꾸미기 상단 리워드 광고 CTA */
+/* 꾸�?�??�단 리워??광고 CTA */
 .ad-reward-card {
   margin: 16px 20px 4px;
   padding: 14px 14px 12px;
   border-radius: 16px;
-  background: #eef4ff;
-  border: 1px solid #d6e4ff;
+  background: var(--pm-tint);
+  border: 1px solid var(--pm-tint-line);
 }
 .ad-reward-copy {
   margin: 0 0 10px;
@@ -630,7 +664,7 @@ body.is-expense-sheet-open .app-shell {
   color: var(--pm-text);
 }
 
-/* 리스트형 배너 — 고정형 권장 사이즈 (width 100% / height 96px) */
+/* 리스?�형 배너 ??고정??권장 ?�이�?(width 100% / height 96px) */
 .banner-ad-wrap {
   margin: 12px 0 8px;
   width: 100%;
@@ -662,7 +696,7 @@ body.is-expense-sheet-open .app-shell {
   white-space: nowrap;
 }
 
-/* 하단 플로팅 탭바 */
+/* ?�단 ?�로????�� */
 .floating-tab {
   position: fixed;
   z-index: 30;
@@ -710,10 +744,10 @@ body.is-expense-sheet-open .app-shell {
 }
 .floating-tab button.active {
   color: var(--pm-blue);
-  background: #eef4ff;
+  background: var(--pm-tint);
 }
 
-/* 기록 추가 FAB */
+/* 기록 추�? FAB */
 .fab-add {
   position: fixed;
   z-index: 35;
@@ -728,7 +762,7 @@ body.is-expense-sheet-open .app-shell {
   border: 0;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(180deg, #4b92f7 0%, var(--pm-blue) 100%);
+  background: linear-gradient(180deg, var(--pm-accent-light) 0%, var(--pm-blue) 100%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.28) inset,
     0 8px 20px rgba(49, 130, 246, 0.32),
@@ -753,7 +787,7 @@ body.is-expense-sheet-open .app-shell {
   display: block;
 }
 
-/* 소비기록 시트 — 폼 박스 좌우에 패딩 (시트 가장자리와 내용칸 사이 여백) */
+/* ?�비기록 ?�트 ????박스 좌우???�딩 (?�트 가?�자리�? ?�용�??�이 ?�백) */
 .expense-sheet-frame {
   display: block;
   width: 100%;
@@ -767,7 +801,7 @@ body.is-expense-sheet-open .app-shell {
   width: 100%;
   max-width: none;
   margin: 0;
-  /* 이 패딩이 종류/금액/메모 내용칸의 좌우 여백 */
+  /* ???�딩??종류/금액/메모 ?�용칸의 좌우 ?�백 */
   padding: 8px 20px 16px;
   box-sizing: border-box;
 }
@@ -853,7 +887,7 @@ body.is-expense-sheet-open .app-shell {
 }
 .category-chip.active {
   border-color: var(--pm-blue);
-  background: #eef4ff;
+  background: var(--pm-tint);
   color: #1b64da;
   box-shadow: inset 0 0 0 1px rgba(49, 130, 246, 0.16);
 }
@@ -913,14 +947,14 @@ body.is-expense-sheet-open .app-shell {
   -webkit-tap-highlight-color: transparent;
 }
 .expense-quick-chips button:active {
-  background: #eef4ff;
+  background: var(--pm-tint);
   border-color: #c9dcff;
 }
 .expense-quick-chips button.is-clear {
   color: var(--pm-text-sub);
 }
 
-/* 소비 날짜 뱃지 (오늘 / 어제 / 다른 날) */
+/* ?�비 ?�짜 뱃�? (?�늘 / ?�제 / ?�른 ?? */
 .expense-date-badges {
   display: flex;
   flex-wrap: wrap;
@@ -988,7 +1022,7 @@ body.is-expense-sheet-open .app-shell {
   line-height: 1.4;
 }
 
-/* —— 방·강아지 연출 (기존 유지, 테두리만 토스 톤) —— */
+/* ?��?방·강?��? ?�출 (기존 ?��?, ?�두리만 ?�스 ?? ?��?*/
 .attic {
   position: relative;
   aspect-ratio: 16/10;
@@ -1100,7 +1134,7 @@ body.is-expense-sheet-open .app-shell {
   pointer-events: none;
   user-select: none;
 }
-/* 강아지 머리 위 말풍선 — 꼬리 달린 채팅 버블 */
+/* 강아지 머리 ??말풍????꼬리 ?�린 채팅 버블 */
 .speech {
   position: absolute;
   z-index: 7;
@@ -1227,7 +1261,7 @@ body.is-expense-sheet-open .app-shell {
   }
 }
 
-/* 첫 실행 소비 유형 설문 오버레이 */
+/* �??�행 강제 ?�님 ???��?가 ???�문 모달 */
 .onboarding-overlay {
   position: fixed;
   inset: 0;
@@ -1239,6 +1273,7 @@ body.is-expense-sheet-open .app-shell {
   backdrop-filter: blur(2px);
 }
 .onboarding-card {
+  position: relative;
   width: min(100%, 420px);
   max-height: min(88vh, 640px);
   overflow: auto;
@@ -1246,6 +1281,23 @@ body.is-expense-sheet-open .app-shell {
   border-radius: 24px 24px 20px 20px;
   background: var(--pm-surface, #fff);
   box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+}
+.onboarding-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f4f6;
+  color: var(--pm-text-sub, #6b7684);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.onboarding-close:active {
+  background: #e5e8eb;
 }
 .onboarding-kicker {
   margin: 0 0 8px;
@@ -1284,8 +1336,8 @@ body.is-expense-sheet-open .app-shell {
   cursor: pointer;
 }
 .onboarding-chip:active {
-  border-color: var(--pm-blue, #3182f6);
-  background: #f5f9ff;
+  border-color: var(--pm-blue);
+  background: var(--pm-tint);
 }
 .onboarding-result-dog {
   display: block;
@@ -1308,4 +1360,57 @@ body.is-expense-sheet-open .app-shell {
 }
 .companion-name-edit {
   margin: 0 20px 12px;
+}
+
+/* ���� �� �� ȭ�� �׸� ���� */
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0 0 4px;
+}
+.theme-swatch {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  margin: 0;
+  padding: 12px 8px;
+  border: 1.5px solid var(--pm-line);
+  border-radius: 16px;
+  background: var(--pm-surface);
+  color: var(--pm-text);
+  cursor: pointer;
+}
+.theme-swatch.is-active {
+  border-color: var(--pm-blue);
+  background: var(--pm-tint);
+  box-shadow: 0 0 0 1px var(--pm-blue);
+}
+.theme-swatch-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--pm-line);
+}
+.theme-swatch-dot.is-pink { background: linear-gradient(145deg, #f3b4d0, #e891b8); }
+.theme-swatch-dot.is-mint { background: linear-gradient(145deg, #a3d4b6, #7cb896); }
+.theme-swatch-dot.is-sky { background: linear-gradient(145deg, #a8d4f5, #7eb8e8); }
+.theme-swatch span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.theme-picker-hint {
+  margin: 10px 0 0;
+  color: var(--pm-text-sub);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.theme-section {
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+.theme-section .expense-section-label {
+  margin-bottom: 10px;
 }

@@ -12,6 +12,8 @@ type Props = {
  * 스크롤 화면용 리스트형 배너.
  * - width 100% / height 96px (고정형 권장)
  * - 미지원·no-fill 시 슬롯을 숨겨 빈 여백을 남기지 않습니다.
+ * - 꾸미기에서는 부모가 리워드 로드 완료 후에만 이 컴포넌트를 마운트해야
+ *   Android 전면/리워드·배너 동시 로드 이슈를 피할 수 있습니다.
  */
 export function BannerAdSlot({ slotId }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
