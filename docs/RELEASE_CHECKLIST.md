@@ -40,8 +40,8 @@
 
 ### 광고·도메인
 
-- [ ] 리워드 광고 그룹 실 ID → `VITE_REWARDED_AD_GROUP_ID` (개발: `ait-ad-test-rewarded-id`)
-- [ ] 배너 광고 그룹 실 ID → `VITE_BANNER_AD_GROUP_ID` (개발: `ait-ad-test-banner-id`)
+- [x] 리워드 광고 그룹 실 ID → 출시 빌드 `ait.v2.live.b1a86b7ff7be433c` (개발: `ait-ad-test-rewarded-id`)
+- [x] 배너 광고 그룹 실 ID → 출시 빌드 `ait.v2.live.57ffb0d441d94b78` (개발: `ait-ad-test-banner-id`)
 - [ ] CORS/Origin에 앱 도메인 허용  
   - 실서비스: `https://pocket-mates.web.tossmini.com`  
   - QR: `https://pocket-mates.private-web.tossmini.com`

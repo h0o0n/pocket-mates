@@ -1,16 +1,29 @@
 /**
  * 인앱 광고 그룹 ID
- * - 개발/QR: 문서 테스트 ID (실 ID로 테스트하면 정책 위반)
- * - 출시: .env 에 콘솔 ID 설정
+ * - 개발/QR(`vite dev`): 문서 테스트 ID. 실 ID로 테스트하면 정책 위반.
+ * - 출시 빌드(`vite build`): 콘솔 라이브 ID.
+ * - `.env`의 VITE_* 값이 있으면 그 값을 우선합니다.
+ * Vite는 `import.meta.env.VITE_*`만 빌드 시 치환하므로 키를 직접 참조합니다.
  */
-export const REWARDED_AD_GROUP_ID =
-  (import.meta.env.VITE_REWARDED_AD_GROUP_ID as string | undefined)?.trim()
-  || 'ait-ad-test-rewarded-id'
+const envOr = (configured: string | undefined, liveId: string, testId: string) => {
+  const fromEnv = configured?.trim()
+  if (fromEnv) return fromEnv
+  return import.meta.env.PROD ? liveId : testId
+}
 
-/** 리스트형 배너 (홈·꾸미기) */
-export const BANNER_AD_GROUP_ID =
-  (import.meta.env.VITE_BANNER_AD_GROUP_ID as string | undefined)?.trim()
-  || 'ait-ad-test-banner-id'
+/** 리워드형 광고. 라이브: ait.v2.live.b1a86b7ff7be433c */
+export const REWARDED_AD_GROUP_ID = envOr(
+  import.meta.env.VITE_REWARDED_AD_GROUP_ID,
+  'ait.v2.live.b1a86b7ff7be433c',
+  'ait-ad-test-rewarded-id',
+)
+
+/** 리스트형 배너 (홈·꾸미기). 라이브: ait.v2.live.57ffb0d441d94b78 */
+export const BANNER_AD_GROUP_ID = envOr(
+  import.meta.env.VITE_BANNER_AD_GROUP_ID,
+  'ait.v2.live.57ffb0d441d94b78',
+  'ait-ad-test-banner-id',
+)
 
 /** 광고 1회 시청 완료 시 지급할 냠 */
 export const REWARD_NYAM_PER_AD = 100
