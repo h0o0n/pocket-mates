@@ -477,6 +477,24 @@ create table if not exists public.mate_daily_successes (
 );
 alter table public.mate_daily_successes add column if not exists mission_type text;
 alter table public.mate_daily_successes add column if not exists goal bigint;
+alter table public.mate_daily_successes add column if not exists theme text not null default 'christmas'
+  check (theme in ('christmas', 'camping'));
+alter table public.mate_daily_successes drop constraint if exists mate_daily_successes_pkey;
+alter table public.mate_daily_successes add primary key (room_id, success_date, theme);
+
+create table if not exists public.mate_theme_progress (
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  theme text not null check (theme in ('christmas', 'camping')),
+  success_days integer not null default 0 check (success_days >= 0),
+  room_level smallint not null default 1 check (room_level between 1 and 4),
+  started_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (room_id, theme)
+);
+alter table public.mate_theme_progress add column if not exists started_at timestamptz not null default now();
+insert into public.mate_theme_progress (room_id, theme, success_days, room_level)
+select id, theme, success_days, room_level from public.mate_rooms
+on conflict (room_id, theme) do nothing;
 
 create or replace function private.is_mate_room_member(p_room_id uuid)
 returns boolean language sql stable security definer set search_path = ''
@@ -494,6 +512,7 @@ alter table public.mate_daily_summaries enable row level security;
 alter table public.mate_shared_expenses enable row level security;
 alter table public.mate_reactions enable row level security;
 alter table public.mate_daily_successes enable row level security;
+alter table public.mate_theme_progress enable row level security;
 
 revoke all on public.mate_rooms, public.mate_room_members, public.mate_invites from anon, authenticated;
 grant select on public.mate_rooms to authenticated;
@@ -502,6 +521,7 @@ grant select, insert, update, delete on public.mate_daily_summaries to authentic
 grant select, insert, update, delete on public.mate_shared_expenses to authenticated;
 grant select, insert, delete on public.mate_reactions to authenticated;
 grant select on public.mate_daily_successes to authenticated;
+grant select on public.mate_theme_progress to authenticated;
 
 drop policy if exists "mate_rooms_members_only" on public.mate_rooms;
 drop policy if exists "mate_rooms_create_own" on public.mate_rooms;
@@ -516,6 +536,7 @@ drop policy if exists "mate_expenses_write_own" on public.mate_shared_expenses;
 drop policy if exists "mate_reactions_members_read" on public.mate_reactions;
 drop policy if exists "mate_reactions_send_own" on public.mate_reactions;
 drop policy if exists "mate_successes_members_read" on public.mate_daily_successes;
+drop policy if exists "mate_theme_progress_members_read" on public.mate_theme_progress;
 
 create policy "mate_rooms_members_only" on public.mate_rooms for select to authenticated
   using (private.is_mate_room_member(id));
@@ -543,6 +564,8 @@ create policy "mate_reactions_send_own" on public.mate_reactions for insert to a
   with check (sender_id = (select auth.uid()) and private.is_mate_room_member(room_id));
 create policy "mate_successes_members_read" on public.mate_daily_successes for select to authenticated
   using (private.is_mate_room_member(room_id));
+create policy "mate_theme_progress_members_read" on public.mate_theme_progress for select to authenticated
+  using (private.is_mate_room_member(room_id));
 
 revoke all on function private.is_mate_room_member(uuid) from public, anon;
 grant execute on function private.is_mate_room_member(uuid) to authenticated;
@@ -559,6 +582,7 @@ begin
     raise exception '이미 다른 친구와 연결되어 있습니다.';
   end if;
   insert into public.mate_rooms (owner_id) values (auth.uid()) returning * into v_room;
+  insert into public.mate_theme_progress (room_id, theme) values (v_room.id, v_room.theme);
   insert into public.mate_room_members (room_id, user_id, display_name)
   values (v_room.id, auth.uid(), left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20));
   loop
@@ -608,6 +632,8 @@ begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
   if p_theme not in ('christmas', 'camping') then raise exception '지원하지 않는 테마입니다.'; end if;
   if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 바꿀 수 있습니다.'; end if;
+  insert into public.mate_theme_progress (room_id, theme) values (p_room_id, p_theme)
+  on conflict (room_id, theme) do nothing;
   update public.mate_rooms set theme = p_theme where id = p_room_id;
   return p_theme;
 end;
@@ -653,10 +679,12 @@ returns jsonb language plpgsql stable security definer set search_path = ''
 as $$
 declare
   v_pick integer;
+  v_theme text;
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
   if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 확인할 수 있습니다.'; end if;
-  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || p_date::text, 0) % 4);
+  select theme into v_theme from public.mate_rooms where id = p_room_id;
+  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || v_theme || p_date::text, 0) % 4);
   return case v_pick
     when 0 then jsonb_build_object('type','each_limit','title','둘 다 15,000원 이하로 쓰기','goal',15000)
     when 1 then jsonb_build_object('type','combined_limit','title','둘이 합쳐 25,000원 이하로 쓰기','goal',25000)
@@ -682,10 +710,18 @@ declare
   v_success_days integer;
   v_level smallint;
   v_inserted integer;
+  v_theme text;
+  v_theme_started_at timestamptz;
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
   if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 완료할 수 있습니다.'; end if;
-  select daily_limit into v_limit from public.mate_rooms where id = p_room_id for update;
+  select daily_limit, theme into v_limit, v_theme from public.mate_rooms where id = p_room_id for update;
+  insert into public.mate_theme_progress (room_id, theme) values (p_room_id, v_theme)
+  on conflict (room_id, theme) do nothing;
+  select started_at into v_theme_started_at from public.mate_theme_progress where room_id = p_room_id and theme = v_theme;
+  if p_date < v_theme_started_at::date then
+    return jsonb_build_object('completed', false, 'reason', '이 테마를 시작한 날부터 미션이 쌓여요.');
+  end if;
   select count(*) into v_member_count from public.mate_room_members where room_id = p_room_id;
   if v_member_count <> 2 then
     return jsonb_build_object('completed', false, 'reason', '친구가 참여하면 시작돼요.');
@@ -695,7 +731,7 @@ begin
   from public.mate_daily_summaries
   where room_id = p_room_id and summary_date = p_date;
   if v_summary_count <> 2 then return jsonb_build_object('completed', false, 'reason', '두 사람의 기록이 모두 필요해요.'); end if;
-  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || p_date::text, 0) % 4);
+  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || v_theme || p_date::text, 0) % 4);
   if v_pick = 0 then
     v_mission_type := 'each_limit'; v_goal := 15000;
     select bool_and(total_spent <= v_goal) into v_success from public.mate_daily_summaries where room_id = p_room_id and summary_date = p_date;
@@ -713,16 +749,22 @@ begin
     v_success := v_category_spent <= v_goal;
   end if;
   if not v_success then return jsonb_build_object('completed', false, 'reason', '어제 공동 미션 한도를 넘었어요.'); end if;
-  insert into public.mate_daily_successes (room_id, success_date, combined_spent, mission_type, goal)
-  values (p_room_id, p_date, v_combined, v_mission_type, v_goal)
-  on conflict (room_id, success_date) do nothing;
+  insert into public.mate_daily_successes (room_id, success_date, combined_spent, mission_type, goal, theme)
+  values (p_room_id, p_date, v_combined, v_mission_type, v_goal, v_theme)
+  on conflict (room_id, success_date, theme) do nothing;
   get diagnostics v_inserted = row_count;
   if v_inserted > 0 then
-    update public.mate_rooms set success_days = success_days + 1 where id = p_room_id;
+    insert into public.mate_theme_progress (room_id, theme, success_days, room_level)
+    values (p_room_id, v_theme, 1, 1)
+    on conflict (room_id, theme) do update
+      set success_days = public.mate_theme_progress.success_days + 1, updated_at = now();
   end if;
-  select success_days into v_success_days from public.mate_rooms where id = p_room_id;
+  insert into public.mate_theme_progress (room_id, theme) values (p_room_id, v_theme)
+  on conflict (room_id, theme) do nothing;
+  select success_days into v_success_days from public.mate_theme_progress where room_id = p_room_id and theme = v_theme;
   v_level := case when v_success_days >= 14 then 4 when v_success_days >= 7 then 3 when v_success_days >= 3 then 2 else 1 end;
-  update public.mate_rooms set room_level = v_level where id = p_room_id;
+  update public.mate_theme_progress set room_level = v_level, updated_at = now() where room_id = p_room_id and theme = v_theme;
+  update public.mate_rooms set success_days = v_success_days, room_level = v_level where id = p_room_id;
   return jsonb_build_object('completed', true, 'new', v_inserted > 0, 'successDays', v_success_days, 'roomLevel', v_level);
 end;
 $$;

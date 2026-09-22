@@ -3,6 +3,7 @@ import { ensureAnonymousSession, supabase } from './supabase.ts'
 
 export type SharedReaction = '잘 참는 중' | '눈찌가 보고 있다' | '오늘도 같이 가자'
 export type SharedRoomTheme = 'christmas' | 'camping'
+export type SharedThemeProgress = Record<SharedRoomTheme, { successDays: number; roomLevel: number }>
 export type SharedMateAvatar = {
   companionId: 'nunchi' | 'foodie' | 'shopper' | 'subscriber'
   outfitId: string
@@ -19,6 +20,23 @@ export type DailyMateMission = {
 const client = () => {
   if (!supabase) throw new Error('Supabase가 연결되지 않았어요.')
   return supabase
+}
+
+const loadThemeProgress = async (roomId: string): Promise<SharedThemeProgress> => {
+  const { data, error } = await client().from('mate_theme_progress')
+    .select('theme, success_days, room_level').eq('room_id', roomId)
+  if (error) throw error
+  const progress: SharedThemeProgress = {
+    christmas: { successDays: 0, roomLevel: 1 },
+    camping: { successDays: 0, roomLevel: 1 },
+  }
+  for (const row of data ?? []) {
+    if (row.theme === 'christmas' || row.theme === 'camping') {
+      const theme: SharedRoomTheme = row.theme
+      progress[theme] = { successDays: Number(row.success_days ?? 0), roomLevel: Number(row.room_level ?? 1) }
+    }
+  }
+  return progress
 }
 
 export const createMateRoom = async (displayName: string) => {
@@ -55,6 +73,8 @@ export const loadMateRoom = async () => {
   const mate = members.data?.find(member => member.user_id !== userId)
   const room = await client().from('mate_rooms').select('theme, success_days, room_level').eq('id', membership.data.room_id).single()
   if (room.error) throw room.error
+  const themeProgress = await loadThemeProgress(membership.data.room_id)
+  const activeProgress = themeProgress[room.data.theme as SharedRoomTheme]
   return {
     roomId: membership.data.room_id as string,
     mateName: mate?.display_name ?? null,
@@ -66,8 +86,9 @@ export const loadMateRoom = async () => {
       parcelPileCount: Number(mate.parcel_pile_count ?? 0),
     } as SharedMateAvatar : null,
     theme: room.data.theme as SharedRoomTheme,
-    successDays: Number(room.data.success_days ?? 0),
-    roomLevel: Number(room.data.room_level ?? 1),
+    successDays: activeProgress.successDays,
+    roomLevel: activeProgress.roomLevel,
+    themeProgress,
   }
 }
 
@@ -120,6 +141,8 @@ export const loadMateActivity = async (roomId: string) => {
   const mate = members.data?.find(row => row.user_id !== userId)
   const room = await client().from('mate_rooms').select('theme, success_days, room_level').eq('id', roomId).single()
   if (room.error) throw room.error
+  const themeProgress = await loadThemeProgress(roomId)
+  const activeProgress = themeProgress[room.data.theme as SharedRoomTheme]
   const mateSummary = summaries.data?.find(row => row.user_id !== userId)
   const shared = await client().from('mate_shared_expenses')
     .select('category, amount, memo, user_id').eq('room_id', roomId)
@@ -135,8 +158,9 @@ export const loadMateActivity = async (roomId: string) => {
       parcelPileCount: Number(mate.parcel_pile_count ?? 0),
     } as SharedMateAvatar : null,
     theme: room.data.theme as SharedRoomTheme,
-    successDays: Number(room.data.success_days ?? 0),
-    roomLevel: Number(room.data.room_level ?? 1),
+    successDays: activeProgress.successDays,
+    roomLevel: activeProgress.roomLevel,
+    themeProgress,
     mateSpentToday: Number(mateSummary?.total_spent ?? 0),
     mateCategoryTotals: (mateSummary?.category_totals ?? {}) as Record<string, number>,
     mateRecentExpenses: (shared.data ?? [])

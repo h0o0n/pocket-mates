@@ -13,7 +13,7 @@ import {
 import { BannerAdSlot } from './components/BannerAdSlot.tsx'
 import { createPersonalBackup, restorePersonalBackup } from './lib/cloudBackup.ts'
 import { ensureAnonymousSession, isSupabaseConfigured } from './lib/supabase.ts'
-import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateAvatar, syncMateDay, updateMateRoomTheme, type DailyMateMission, type SharedMateAvatar } from './lib/mateRoom.ts'
+import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateAvatar, syncMateDay, updateMateRoomTheme, type DailyMateMission, type SharedMateAvatar, type SharedThemeProgress } from './lib/mateRoom.ts'
 import {
   loadJson,
   migrateLegacyKeys,
@@ -88,6 +88,7 @@ interface MateRoomState {
   theme: MateTheme
   successDays: number
   roomLevel: number
+  themeProgress: SharedThemeProgress
 }
 
 const DAILY_MATE_LIMIT = 15_000
@@ -106,6 +107,10 @@ const defaultMateRoom: MateRoomState = {
   theme: 'christmas',
   successDays: 0,
   roomLevel: 1,
+  themeProgress: {
+    christmas: { successDays: 0, roomLevel: 1 },
+    camping: { successDays: 0, roomLevel: 1 },
+  },
 }
 
 const THEME_OPTIONS: Array<{ id: ThemeId; label: string; primary: string }> = [
@@ -884,7 +889,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [listMonth, setListMonth] = useState(() => new Date().getMonth())
   const [listWeekKey, setListWeekKey] = useState(() => dateKey(startOfWeek(new Date())))
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
-  const [shopTab, setShopTab] = useState<'rooms' | 'outfits' | 'companions' | 'props'>('rooms')
+  const [shopTab, setShopTab] = useState<'rooms' | 'outfits' | 'companions' | 'props' | 'together'>('rooms')
   // 온보딩: 소비 유형 설문 → 결과 → 이름 짓기
   const [onboardingDone, setOnboardingDone] = useState(() => loadJson(k('onboarding-done'), false))
   const [spendingType, setSpendingType] = useState<SpendingType | null>(() => loadJson(k('spending-type'), null))
@@ -1164,6 +1169,13 @@ function PocketApp({ userHash }: { userHash: string }) {
             ...current,
             successDays: result.successDays ?? current.successDays,
             roomLevel: result.roomLevel ?? current.roomLevel,
+            themeProgress: {
+              ...current.themeProgress,
+              [current.theme]: {
+                successDays: result.successDays ?? current.successDays,
+                roomLevel: result.roomLevel ?? current.roomLevel,
+              },
+            },
           }))
           if (result.new) setMessage('오늘 둘이 한도 지키기 성공! 함께 쓰는 공간이 자랐어요.')
         })
@@ -1959,13 +1971,20 @@ function PocketApp({ userHash }: { userHash: string }) {
   }
   const selectMateTheme = async (theme: MateTheme) => {
     if (!mateRoom.roomId) return setMessage('친구 연결 상태를 다시 확인해 주세요.')
-    const previous = mateRoom.theme
-    setMateRoom(current => ({ ...current, theme }))
+    const previous = mateRoom
+    const progress = mateRoom.themeProgress[theme]
+    setMateRoom(current => ({ ...current, theme, ...progress }))
     try {
       await updateMateRoomTheme(mateRoom.roomId, theme)
+      const [activity, mission] = await Promise.all([
+        loadMateActivity(mateRoom.roomId),
+        loadDailyMateMission(mateRoom.roomId),
+      ])
+      setMateRoom(current => ({ ...current, ...activity }))
+      setDailyMateMission(mission)
       setMessage(`${theme === 'christmas' ? '크리스마스' : '캠핑'} 테마로 바꿨어요.`)
     } catch (error) {
-      setMateRoom(current => ({ ...current, theme: previous }))
+      setMateRoom(previous)
       setMessage(error instanceof Error ? error.message : '함께 보기 테마를 바꾸지 못했어요.')
     }
   }
@@ -1983,6 +2002,7 @@ function PocketApp({ userHash }: { userHash: string }) {
       await leaveMateRoom(mateRoom.roomId)
       setMateRoom(defaultMateRoom)
       setRoomView('personal')
+      setShopTab(current => current === 'together' ? 'rooms' : current)
       setLeaveMateConfirm(false)
       setMessage('친구 연결을 끊었어요. 공유 데이터도 함께 종료됐어요.')
     } catch (error) {
@@ -2356,10 +2376,6 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : (
             <div className="panel-body">
-              <div className="mate-theme-picker" role="radiogroup" aria-label="함께 보기 테마">
-                <button type="button" role="radio" aria-checked={mateRoom.theme === 'christmas'} className={mateRoom.theme === 'christmas' ? 'active' : ''} onClick={() => void selectMateTheme('christmas')}>크리스마스</button>
-                <button type="button" role="radio" aria-checked={mateRoom.theme === 'camping'} className={mateRoom.theme === 'camping' ? 'active' : ''} onClick={() => void selectMateTheme('camping')}>캠핑</button>
-              </div>
               <button type="button" className="open-main-team-room" onClick={() => { setRoomView('team'); setActivePanel('expense') }}>
                 <span><b>{companionName} + {mateRoom.mateName}</b><small>{mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} · {mateRoom.roomLevel}단계</small></span>
                 <strong>함께 보기</strong>
@@ -2777,7 +2793,7 @@ function PocketApp({ userHash }: { userHash: string }) {
             {spendingType ? ` (설문 ${companions.find(item => item.id === spendingType)?.title})` : ''}
             . 방·코스튬·소품·눈찌를 바꿀 수 있어요.
           </p>
-          <div className="segment four">
+          <div className={`segment ${mateRoom.mateName ? 'five' : 'four'}`}>
             <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')} type="button">
               방 스킨
             </button>
@@ -2790,6 +2806,11 @@ function PocketApp({ userHash }: { userHash: string }) {
             <button className={shopTab === 'companions' ? 'active' : ''} onClick={() => setShopTab('companions')} type="button">
               눈찌
             </button>
+            {mateRoom.mateName && (
+              <button className={shopTab === 'together' ? 'active' : ''} onClick={() => setShopTab('together')} type="button">
+                같이
+              </button>
+            )}
           </div>
           {shopTab === 'rooms' ? (
             <div className="skin-grid">
@@ -2881,6 +2902,29 @@ function PocketApp({ userHash }: { userHash: string }) {
                 })}
               </div>
             </>
+          ) : shopTab === 'together' && mateRoom.mateName ? (
+            <div className="together-theme-shop">
+              <p className="shop-lock-hint">
+                테마마다 미션 성공 일수와 성장 단계가 따로 쌓여요. 다른 테마로 바꿔도 이전 진행도는 그대로 남아요.
+              </p>
+              {(['christmas', 'camping'] as MateTheme[]).map(theme => {
+                const progress = mateRoom.themeProgress[theme]
+                const active = mateRoom.theme === theme
+                const title = theme === 'christmas' ? '크리스마스' : '캠프파이어'
+                return (
+                  <article className={`together-theme-card ${active ? 'equipped' : ''}`} key={theme}>
+                    <img src={`/assets/rooms/shared/${theme}/room-level-${progress.roomLevel}.png`} alt={`${title} ${progress.roomLevel}단계`} />
+                    <div>
+                      <p><b>{title}</b><span>{progress.roomLevel}단계 · {progress.successDays}일 성공</span></p>
+                      <small>{progress.roomLevel >= 4 ? '완성된 테마예요.' : `${progress.roomLevel === 1 ? 3 : progress.roomLevel === 2 ? 7 : 14}일 성공하면 다음 모습으로 변해요.`}</small>
+                    </div>
+                    <Button display="block" size="small" color={active ? 'dark' : 'primary'} variant={active ? 'weak' : 'fill'} disabled={active} onClick={() => void selectMateTheme(theme)}>
+                      {active ? '사용 중' : progress.successDays > 0 ? '이어하기' : '새로 시작'}
+                    </Button>
+                  </article>
+                )
+              })}
+            </div>
           ) : (
             <>
               <div className="companion-name-edit">
