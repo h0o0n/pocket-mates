@@ -410,6 +410,14 @@ create table if not exists public.mate_room_members (
 alter table public.mate_room_members
   add column if not exists display_name text not null default '눈찌'
   check (char_length(display_name) between 1 and 20);
+alter table public.mate_room_members
+  add column if not exists companion_id text not null default 'nunchi'
+  check (companion_id in ('nunchi', 'foodie', 'shopper', 'subscriber'));
+alter table public.mate_room_members
+  add column if not exists outfit_id text not null default 'none';
+alter table public.mate_room_members
+  add column if not exists visual_state text not null default 'neutral'
+  check (visual_state in ('neutral', 'chubby', 'very-chubby', 'receipt', 'eating'));
 
 create table if not exists public.mate_invites (
   id uuid primary key default gen_random_uuid(),
@@ -601,6 +609,33 @@ $$;
 
 revoke all on function public.set_mate_room_theme(uuid, text) from public, anon;
 grant execute on function public.set_mate_room_theme(uuid, text) to authenticated;
+
+create or replace function public.sync_mate_avatar(
+  p_room_id uuid,
+  p_display_name text,
+  p_companion_id text,
+  p_outfit_id text,
+  p_visual_state text
+)
+returns boolean language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 변경할 수 있습니다.'; end if;
+  if p_companion_id not in ('nunchi', 'foodie', 'shopper', 'subscriber') then raise exception '지원하지 않는 눈찌입니다.'; end if;
+  if p_visual_state not in ('neutral', 'chubby', 'very-chubby', 'receipt', 'eating') then raise exception '지원하지 않는 상태입니다.'; end if;
+  update public.mate_room_members
+  set display_name = left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20),
+      companion_id = p_companion_id,
+      outfit_id = left(coalesce(nullif(trim(p_outfit_id), ''), 'none'), 60),
+      visual_state = p_visual_state
+  where room_id = p_room_id and user_id = auth.uid();
+  return found;
+end;
+$$;
+
+revoke all on function public.sync_mate_avatar(uuid, text, text, text, text) from public, anon;
+grant execute on function public.sync_mate_avatar(uuid, text, text, text, text) to authenticated;
 
 create or replace function public.get_mate_daily_mission(p_room_id uuid, p_date date default current_date)
 returns jsonb language plpgsql stable security definer set search_path = ''

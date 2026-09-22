@@ -13,7 +13,7 @@ import {
 import { BannerAdSlot } from './components/BannerAdSlot.tsx'
 import { createPersonalBackup, restorePersonalBackup } from './lib/cloudBackup.ts'
 import { ensureAnonymousSession, isSupabaseConfigured } from './lib/supabase.ts'
-import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateDay, updateMateRoomTheme, type DailyMateMission } from './lib/mateRoom.ts'
+import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateAvatar, syncMateDay, updateMateRoomTheme, type DailyMateMission, type SharedMateAvatar } from './lib/mateRoom.ts'
 import {
   loadJson,
   migrateLegacyKeys,
@@ -78,6 +78,7 @@ interface MateRoomState {
   roomId: string | null
   inviteCode: string
   mateName: string | null
+  mateAvatar: SharedMateAvatar | null
   mateSpentToday: number
   shareDetails: boolean
   mateRecentExpenses: Array<{ category: ExpenseCategory; amount: number; memo: string }>
@@ -95,6 +96,7 @@ const defaultMateRoom: MateRoomState = {
   roomId: null,
   inviteCode: '',
   mateName: null,
+  mateAvatar: null,
   mateSpentToday: 0,
   shareDetails: true,
   mateRecentExpenses: [],
@@ -1091,6 +1093,13 @@ function PocketApp({ userHash }: { userHash: string }) {
   const availableOutfits = characterOutfits.filter(outfit => outfit.companionId === null || outfit.companionId === companionId)
   const dogStateMap = equippedClothes.states ?? activeCompanion.states
   const displayDogImage = dogStateMap[dogVisualState]
+  const mateCompanion = companions.find(item => item.id === mateRoom.mateAvatar?.companionId) ?? companions[0]
+  const mateOutfit = characterOutfits.find(outfit =>
+    outfit.id === mateRoom.mateAvatar?.outfitId
+    && (outfit.companionId === null || outfit.companionId === mateCompanion.id)
+  ) ?? characterOutfits[0]
+  const mateStateMap = mateOutfit.states ?? mateCompanion.states
+  const mateDisplayImage = mateStateMap[mateRoom.mateAvatar?.visualState ?? 'neutral']
   const myMateProgress = Math.min(100, (todaySpent / DAILY_MATE_LIMIT) * 100)
   const friendMateProgress = Math.min(100, (mateRoom.mateSpentToday / DAILY_MATE_LIMIT) * 100)
   const myTodayExpenses = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
@@ -1168,6 +1177,17 @@ function PocketApp({ userHash }: { userHash: string }) {
     }, 500)
     return () => window.clearTimeout(timer)
   }, [mateRoom.roomId, mateRoom.shareDetails, expenses])
+  useEffect(() => {
+    if (!mateRoom.roomId || !isSupabaseConfigured) return
+    const timer = window.setTimeout(() => {
+      void syncMateAvatar(mateRoom.roomId!, companionName, {
+        companionId,
+        outfitId: equippedClothes.id,
+        visualState: dogVisualState,
+      }).catch(() => {})
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [mateRoom.roomId, companionName, companionId, equippedClothes.id, dogVisualState])
   useEffect(() => {
     if (!mateRoom.roomId || !isSupabaseConfigured) return
     let alive = true
@@ -2087,7 +2107,7 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
             <div className="party-mates">
               <div><img src={displayDogImage} alt={companionName} /><span>{companionName}</span></div>
-              <div><span className="friend-nunchi" aria-hidden="true">●ᴥ●</span><span>{mateRoom.mateName}</span></div>
+              <div><img src={mateDisplayImage} alt={`현재 ${mateRoom.mateName} 상태`} /><span>{mateRoom.mateName}</span></div>
             </div>
             <div className="main-team-status">
               <b>{dailyMateMission.title}</b>
