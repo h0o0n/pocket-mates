@@ -1563,7 +1563,7 @@ body.is-expense-sheet-open .app-shell {
 /* 둘만의 공동룸 */
 .mate-panel .panel-body { display: grid; gap: 14px; }
 .mate-invite-card { padding: 18px 20px 24px; text-align: center; }
-.mate-invite-card h3, .mate-feed h3, .mate-reactions h3 { margin: 0; font-size: 16px; }
+.mate-invite-card h3, .mate-feed h3 { margin: 0; font-size: 16px; }
 .mate-invite-card > p { margin: 0; color: var(--pm-text-sub); font-size: 13px; line-height: 1.55; }
 .mate-room-preview { display: flex; align-items: center; justify-content: center; gap: 13px; min-height: 112px; border-radius: 20px; background: var(--pm-tint); font-size: 42px; }
 .mate-room-preview b { color: var(--pm-text-sub); font-size: 18px; }
@@ -1592,14 +1592,12 @@ body.is-expense-sheet-open .app-shell {
 .mate-share-toggle span { display: grid; gap: 2px; }
 .mate-share-toggle small { color: var(--pm-text-sub); font-size: 11px; }
 .mate-share-toggle input { width: 22px; height: 22px; accent-color: var(--pm-blue); }
-.mate-feed, .mate-reactions { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--pm-line); border-radius: 18px; }
+.mate-feed { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--pm-line); border-radius: 18px; }
 .mate-feed > div { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 8px; }
 .mate-feed p { display: grid; margin: 0; }
 .mate-feed p b { font-size: 13px; }
 .mate-feed p small, .mate-empty-copy { color: var(--pm-text-sub); font-size: 11px; }
 .mate-feed strong { font-size: 13px; }
-.mate-reactions > div { display: flex; flex-wrap: wrap; gap: 7px; }
-.mate-reactions button { padding: 9px 11px; border: 1px solid var(--pm-tint-line); border-radius: 999px; background: var(--pm-tint); color: var(--pm-text); font-size: 12px; font-weight: 700; }
 .main-team-room { border-radius: 20px; box-shadow: 0 8px 24px rgba(25,31,40,.08); }
 /* 미션 칩 — 방 아래가 아니라 가운데 위, 작게 + 닫기 */
 .main-team-status {
@@ -1660,11 +1658,6 @@ body.is-expense-sheet-open .app-shell {
 .team-room-empty > span { font-size: 34px; }
 .team-room-empty > b { font-size: 15px; }
 .team-room-empty button { padding: 9px 14px; border: 0; border-radius: 999px; background: var(--pm-blue); color: #fff; font-size: 12px; font-weight: 800; }
-.open-main-team-room { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px 15px; border: 1px solid var(--pm-tint-line); border-radius: 16px; background: var(--pm-tint); color: var(--pm-text); text-align: left; }
-.open-main-team-room span { display: grid; gap: 3px; min-width: 0; }
-.open-main-team-room b { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.open-main-team-room small { color: var(--pm-text-sub); font-size: 11px; }
-.open-main-team-room > strong { flex: none; color: var(--pm-blue); font-size: 12px; }
 .mate-danger-zone { padding-top: 5px; border-top: 1px solid var(--pm-line); }
 .mate-leave-button { width: 100%; padding: 12px; border: 0; background: transparent; color: #e34d59; font-size: 13px; font-weight: 700; }
 .mate-leave-confirm { display: grid; gap: 12px; padding: 14px; border-radius: 16px; background: color-mix(in srgb, #f04452 8%, var(--pm-surface)); }

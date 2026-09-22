@@ -13,7 +13,7 @@ import {
 import { BannerAdSlot } from './components/BannerAdSlot.tsx'
 import { createPersonalBackup, restorePersonalBackup } from './lib/cloudBackup.ts'
 import { ensureAnonymousSession, isSupabaseConfigured } from './lib/supabase.ts'
-import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateAvatar, syncMateDay, updateMateRoomTheme, type DailyMateMission, type SharedMateAvatar, type SharedThemeProgress } from './lib/mateRoom.ts'
+import { acceptMateInvite, completeMateDailyMission, createMateRoom, leaveMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, syncMateAvatar, syncMateDay, updateMateRoomTheme, type DailyMateMission, type SharedMateAvatar, type SharedThemeProgress } from './lib/mateRoom.ts'
 import {
   loadJson,
   migrateLegacyKeys,
@@ -71,7 +71,6 @@ type ListPeriod = 'weekly' | 'monthly' | 'yearly'
 type OnboardingStep = 'survey' | 'result' | 'name'
 /** 전체 UI 파스텔 테마 (버튼·탭·강조색 포함) */
 type ThemeId = 'pink' | 'mint' | 'sky'
-type MateReaction = '잘 참는 중' | '눈찌가 보고 있다' | '오늘도 같이 가자'
 type MateTheme = 'christmas' | 'camping'
 
 interface MateRoomState {
@@ -83,7 +82,6 @@ interface MateRoomState {
   shareDetails: boolean
   mateRecentExpenses: Array<{ category: ExpenseCategory; amount: number; memo: string }>
   mateCategoryTotals: Record<string, number>
-  reactions: Array<{ id: string; from: 'me' | 'mate'; text: MateReaction; createdAt: string }>
   sharedNyam: number
   theme: MateTheme
   successDays: number
@@ -92,7 +90,6 @@ interface MateRoomState {
 }
 
 const DAILY_MATE_LIMIT = 15_000
-const mateReactions: MateReaction[] = ['잘 참는 중', '눈찌가 보고 있다', '오늘도 같이 가자']
 const defaultMateRoom: MateRoomState = {
   roomId: null,
   inviteCode: '',
@@ -102,7 +99,6 @@ const defaultMateRoom: MateRoomState = {
   shareDetails: true,
   mateRecentExpenses: [],
   mateCategoryTotals: {},
-  reactions: [],
   sharedNyam: 0,
   theme: 'christmas',
   successDays: 0,
@@ -1998,23 +1994,6 @@ function PocketApp({ userHash }: { userHash: string }) {
       setMessage(error instanceof Error ? error.message : '친구와 연결하지 못했어요.')
     }
   }
-  const sendMateReaction = async (text: MateReaction) => {
-    if (!mateRoom.mateName) return setMessage('먼저 친구를 초대해 주세요.')
-    if (!mateRoom.roomId) return setMessage('친구 연결 상태를 다시 확인해 주세요.')
-    try {
-      await sendMateReactionToRoom(mateRoom.roomId, text)
-    } catch (error) {
-      return setMessage(error instanceof Error ? error.message : '반응을 보내지 못했어요.')
-    }
-    setMateRoom(current => ({
-      ...current,
-      reactions: [
-        { id: crypto.randomUUID(), from: 'me' as const, text, createdAt: new Date().toISOString() },
-        ...current.reactions,
-      ].slice(0, 8),
-    }))
-    setMessage(`${text} 반응을 보냈어요.`)
-  }
   const selectMateTheme = async (theme: MateTheme) => {
     if (!mateRoom.roomId) return setMessage('친구 연결 상태를 다시 확인해 주세요.')
     const previous = mateRoom
@@ -2529,11 +2508,6 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : (
             <div className="panel-body">
-              <button type="button" className="open-main-team-room" onClick={() => { setRoomView('team'); setActivePanel('expense') }}>
-                <span><b>{companionName} + {mateRoom.mateName}</b><small>{mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} · {mateRoom.roomLevel}단계</small></span>
-                <strong>함께 보기</strong>
-              </button>
-
               <div className="mate-level-card">
                 <p><b>함께 꾸미기 {mateRoom.roomLevel}단계</b><span>{mateRoom.successDays}일 성공</span></p>
                 <i><em style={{ width: `${mateLevelProgress}%` }} /></i>
@@ -2596,11 +2570,6 @@ function PocketApp({ userHash }: { userHash: string }) {
                   ))}
                 </div>
               )}
-
-              <div className="mate-reactions">
-                <h3>눈찌 반응 보내기</h3>
-                <div>{mateReactions.map(reaction => <button type="button" key={reaction} onClick={() => void sendMateReaction(reaction)}>{reaction}</button>)}</div>
-              </div>
 
               <div className="mate-danger-zone">
                 {!leaveMateConfirm ? (
