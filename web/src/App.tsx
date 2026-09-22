@@ -11,6 +11,9 @@ import {
   rewardAdCooldownRemainingSec,
 } from './lib/ads.ts'
 import { BannerAdSlot } from './components/BannerAdSlot.tsx'
+import { createPersonalBackup, restorePersonalBackup } from './lib/cloudBackup.ts'
+import { ensureAnonymousSession, isSupabaseConfigured } from './lib/supabase.ts'
+import { acceptMateInvite, createMateRoom, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateDay, updateMateRoomTheme } from './lib/mateRoom.ts'
 import {
   loadJson,
   migrateLegacyKeys,
@@ -53,7 +56,11 @@ const roomImages = {
 } as const
 
 type SkinId = 'attic' | 'cloud' | 'game' | 'cafe' | 'library' | 'beach' | 'christmas' | 'camping'
-type OutfitId = 'none' | 'scarf' | 'sweater' | 'raincoat'
+type OutfitId =
+  | 'none' | 'scarf' | 'sweater' | 'raincoat'
+  | 'bear-gingham-bib' | 'bear-honey-cape' | 'bear-cook-apron'
+  | 'raccoon-courier-vest' | 'raccoon-navy-hoodie' | 'raccoon-coral-satchel'
+  | 'seal-sailor-collar' | 'seal-lavender-sleep' | 'seal-mint-headphones'
 /** 기본 눈찌 + 소비 유형 컴패니언 3종 */
 type CompanionId = 'nunchi' | 'foodie' | 'shopper' | 'subscriber'
 /** 설문으로 고르는 소비 유형 (눈찌 제외) */
@@ -64,6 +71,34 @@ type ListPeriod = 'weekly' | 'monthly' | 'yearly'
 type OnboardingStep = 'survey' | 'result' | 'name'
 /** 전체 UI 파스텔 테마 (버튼·탭·강조색 포함) */
 type ThemeId = 'pink' | 'mint' | 'sky'
+type MateReaction = '잘 참는 중' | '눈찌가 보고 있다' | '오늘도 같이 가자'
+type MateTheme = 'christmas' | 'camping'
+
+interface MateRoomState {
+  roomId: string | null
+  inviteCode: string
+  mateName: string | null
+  mateSpentToday: number
+  shareDetails: boolean
+  mateRecentExpenses: Array<{ category: ExpenseCategory; amount: number; memo: string }>
+  reactions: Array<{ id: string; from: 'me' | 'mate'; text: MateReaction; createdAt: string }>
+  sharedNyam: number
+  theme: MateTheme
+}
+
+const DAILY_MATE_LIMIT = 15_000
+const mateReactions: MateReaction[] = ['잘 참는 중', '눈찌가 보고 있다', '오늘도 같이 가자']
+const defaultMateRoom: MateRoomState = {
+  roomId: null,
+  inviteCode: '',
+  mateName: null,
+  mateSpentToday: 0,
+  shareDetails: true,
+  mateRecentExpenses: [],
+  reactions: [],
+  sharedNyam: 0,
+  theme: 'christmas',
+}
 
 const THEME_OPTIONS: Array<{ id: ThemeId; label: string; primary: string }> = [
   { id: 'pink', label: '핑크', primary: '#E891B8' },
@@ -282,6 +317,18 @@ const outfitDogStates = (outfitId: Exclude<OutfitId, 'none'>): Record<DogVisualS
   eating: `/assets/characters/states/dog-eating-${outfitId}.png`,
 })
 
+const companionOutfitStates = (
+  companionId: Exclude<CompanionId, 'nunchi'>,
+  animal: 'bear' | 'raccoon' | 'seal',
+  outfitId: string,
+): Record<DogVisualState, string> => ({
+  neutral: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-neutral.png`,
+  chubby: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-chubby.png`,
+  'very-chubby': `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-very-chubby.png`,
+  receipt: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-receipt.png`,
+  eating: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-eating.png`,
+})
+
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
   { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
   { id: 'cloud', name: '구름방', description: '구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
@@ -295,10 +342,11 @@ const roomSkins: Array<{ id: SkinId; name: string; description: string; price: n
 
 /**
  * 캐릭터 코스튬 — 통짜 PNG 교체.
- * states가 null이면 맨몸(baseDogStates), 있으면 옷별 5상태 전부 사용 (guide.md).
+ * states가 null이면 현재 눈찌의 맨몸 상태맵, 있으면 해당 눈찌 옷의 5상태를 사용합니다.
  */
-const dogOutfits: Array<{
+const characterOutfits: Array<{
   id: OutfitId
+  companionId: CompanionId | null
   name: string
   description: string
   price: number
@@ -306,10 +354,19 @@ const dogOutfits: Array<{
   image: string | null
   states: Record<DogVisualState, string> | null
 }> = [
-  { id: 'none', name: '맨몸', description: '기본 지급 · 아무것도 안 입은 상태', price: 0, image: null, states: null },
-  { id: 'scarf', name: '빨간 목도리', description: '추울 때 잔액도 같이 따뜻해 보이는 목도리', price: 120, image: '/assets/characters/outfits/scarf.png', states: outfitDogStates('scarf') },
-  { id: 'sweater', name: '니트 스웨터', description: '통통한 배가 더 티 나는 따뜻한 니트', price: 180, image: '/assets/characters/outfits/sweater.png', states: outfitDogStates('sweater') },
-  { id: 'raincoat', name: '하늘색 우비', description: '비 오는 날 충동구매를 막아 줄지도 모르는 우비', price: 220, image: '/assets/characters/outfits/raincoat.png', states: outfitDogStates('raincoat') },
+  { id: 'none', companionId: null, name: '맨몸', description: '기본 지급 · 아무것도 안 입은 상태', price: 0, image: null, states: null },
+  { id: 'scarf', companionId: 'nunchi', name: '빨간 목도리', description: '추울 때 잔액도 같이 따뜻해 보이는 목도리', price: 120, image: '/assets/characters/outfits/scarf.png', states: outfitDogStates('scarf') },
+  { id: 'sweater', companionId: 'nunchi', name: '니트 스웨터', description: '통통한 배가 더 티 나는 따뜻한 니트', price: 180, image: '/assets/characters/outfits/sweater.png', states: outfitDogStates('sweater') },
+  { id: 'raincoat', companionId: 'nunchi', name: '하늘색 우비', description: '비 오는 날 충동구매를 막아 줄지도 모르는 우비', price: 220, image: '/assets/characters/outfits/raincoat.png', states: outfitDogStates('raincoat') },
+  { id: 'bear-gingham-bib', companionId: 'foodie', name: '체크 턱받이', description: '먹보곰의 간식 시간을 위한 빨간 체크 턱받이', price: 140, image: '/assets/characters/companions/foodie/outfits/gingham-bib/bear-neutral.png', states: companionOutfitStates('foodie', 'bear', 'gingham-bib') },
+  { id: 'bear-honey-cape', companionId: 'foodie', name: '꿀단지 망토', description: '꿀 냄새를 따라갈 때 입는 노란 후드 망토', price: 190, image: '/assets/characters/companions/foodie/outfits/honey-cape/bear-neutral.png', states: companionOutfitStates('foodie', 'bear', 'honey-cape') },
+  { id: 'bear-cook-apron', companionId: 'foodie', name: '간식 요리사', description: '먹기 전에 직접 만드는 척하는 앞치마', price: 230, image: '/assets/characters/companions/foodie/outfits/cook-apron/bear-neutral.png', states: companionOutfitStates('foodie', 'bear', 'cook-apron') },
+  { id: 'raccoon-courier-vest', companionId: 'shopper', name: '택배 대장', description: '택배 상자를 누구보다 먼저 발견하는 조끼', price: 160, image: '/assets/characters/companions/shopper/outfits/courier-vest/raccoon-neutral.png', states: companionOutfitStates('shopper', 'raccoon', 'courier-vest') },
+  { id: 'raccoon-navy-hoodie', companionId: 'shopper', name: '새벽 쇼핑 후드', description: '장바구니를 조용히 채우기 좋은 남색 후드', price: 210, image: '/assets/characters/companions/shopper/outfits/navy-hoodie/raccoon-neutral.png', states: companionOutfitStates('shopper', 'raccoon', 'navy-hoodie') },
+  { id: 'raccoon-coral-satchel', companionId: 'shopper', name: '득템 크로스백', description: '세일 알림을 담아 다니는 산호색 가방', price: 240, image: '/assets/characters/companions/shopper/outfits/coral-satchel/raccoon-neutral.png', states: companionOutfitStates('shopper', 'raccoon', 'coral-satchel') },
+  { id: 'seal-sailor-collar', companionId: 'subscriber', name: '구독 항해단', description: '자동결제의 바다를 건너는 세일러 옷', price: 140, image: '/assets/characters/companions/subscriber/outfits/sailor-collar/seal-neutral.png', states: companionOutfitStates('subscriber', 'seal', 'sailor-collar') },
+  { id: 'seal-lavender-sleep', companionId: 'subscriber', name: '무료체험 잠옷', description: '해지일을 잊고 편히 자는 보랏빛 잠옷', price: 180, image: '/assets/characters/companions/subscriber/outfits/lavender-sleep/seal-neutral.png', states: companionOutfitStates('subscriber', 'seal', 'lavender-sleep') },
+  { id: 'seal-mint-headphones', companionId: 'subscriber', name: '정주행 헤드폰', description: '구독 콘텐츠를 끝까지 보는 민트 헤드폰', price: 220, image: '/assets/characters/companions/subscriber/outfits/mint-headphones/seal-neutral.png', states: companionOutfitStates('subscriber', 'seal', 'mint-headphones') },
 ]
 
 /** 식비 누적 시 랜덤하게 쌓이는 음식·배달 소품 (다양성 유지) */
@@ -639,7 +696,10 @@ export default function App() {
 
   useEffect(() => {
     let alive = true
-    void resolveUserHash().then(hash => {
+    void Promise.all([
+      resolveUserHash(),
+      isSupabaseConfigured ? ensureAnonymousSession().catch(() => null) : Promise.resolve(null),
+    ]).then(([hash]) => {
       if (!alive) return
       migrateLegacyKeys(hash)
       setUserHash(hash)
@@ -668,7 +728,8 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [period, setPeriod] = useState(() => getCalendarPeriod())
   const { todayKey, monthKey, weekKey, weekStart: thisWeekStart, weekEnd: thisWeekEnd } = period
 
-  const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'shop'>('expense')
+  const [activePanel, setActivePanel] = useState<'expense' | 'budget' | 'history' | 'mates' | 'shop' | 'settings'>('expense')
+  const [guideExpanded, setGuideExpanded] = useState(false)
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false)
   const [plan, setPlan] = useState<BudgetPlan>(() => loadJson(k('plan'), defaultPlan))
   const [draftPlan, setDraftPlan] = useState(plan)
@@ -708,7 +769,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   ))
   const [viewMonth, setViewMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState(() => period.todayKey)
-  const [historyView, setHistoryView] = useState<'calendar' | 'list'>('list')
+  const [historyView, setHistoryView] = useState<'calendar' | 'list' | 'report'>('list')
   const [listPeriod, setListPeriod] = useState<ListPeriod>('monthly')
   const [listYear, setListYear] = useState(() => new Date().getFullYear())
   const [listMonth, setListMonth] = useState(() => new Date().getMonth())
@@ -735,6 +796,14 @@ function PocketApp({ userHash }: { userHash: string }) {
     const saved = loadJson<unknown>(k('ui-theme'), 'sky')
     return isThemeId(saved) ? saved : 'sky'
   })
+  const [mateRoom, setMateRoom] = useState<MateRoomState>(() => ({
+    ...defaultMateRoom,
+    ...loadJson(k('mate-room'), defaultMateRoom),
+  }))
+  const [mateCodeInput, setMateCodeInput] = useState('')
+  const [backupCode, setBackupCode] = useState('')
+  const [backupCodeInput, setBackupCodeInput] = useState('')
+  const [backupBusy, setBackupBusy] = useState(false)
   // 리워드 광고: 로드 완료 후에만 시청 가능 + 일일 한도/쿨다운
   const [rewardAdReady, setRewardAdReady] = useState(false)
   const [rewardAdBusy, setRewardAdBusy] = useState(false)
@@ -845,6 +914,9 @@ function PocketApp({ userHash }: { userHash: string }) {
     return foodProps[stableIndex(seedExpense?.id ?? String(index), foodProps.length)]
   })
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
+  const todaySpent = expenses
+    .filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
+    .reduce((sum, expense) => sum + expense.amount, 0)
   const weekExpenseCount = expenses.filter(expense => {
     const spent = new Date(expense.spentAt)
     return spent >= thisWeekStart && spent < thisWeekEnd
@@ -885,13 +957,29 @@ function PocketApp({ userHash }: { userHash: string }) {
         : snapshot.stage === 'worried' || snapshot.stage === 'speechless'
           ? 'receipt'
           : 'neutral'
-  const equippedClothes = dogOutfits.find(outfit => outfit.id === equippedOutfit) ?? dogOutfits[0]
-  // 눈찌만 코스튬 상태맵 사용. 다른 컴패니언은 companions/{id} 5상태를 그대로 씀.
   const activeCompanion = companions.find(item => item.id === companionId) ?? companions[0]
-  const dogStateMap = companionId === 'nunchi'
-    ? (equippedClothes.states ?? baseDogStates)
-    : activeCompanion.states
+  const equippedClothes = characterOutfits.find(outfit =>
+    outfit.id === equippedOutfit && (outfit.companionId === null || outfit.companionId === companionId)
+  ) ?? characterOutfits[0]
+  const availableOutfits = characterOutfits.filter(outfit => outfit.companionId === null || outfit.companionId === companionId)
+  const dogStateMap = equippedClothes.states ?? activeCompanion.states
   const displayDogImage = dogStateMap[dogVisualState]
+  const myMateProgress = Math.min(100, (todaySpent / DAILY_MATE_LIMIT) * 100)
+  const friendMateProgress = Math.min(100, (mateRoom.mateSpentToday / DAILY_MATE_LIMIT) * 100)
+  const mateMissionComplete = Boolean(mateRoom.mateName)
+    && todaySpent <= DAILY_MATE_LIMIT
+    && mateRoom.mateSpentToday <= DAILY_MATE_LIMIT
+  const myTodayExpenses = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
+  const mateFoodCount = [
+    ...myTodayExpenses,
+    ...mateRoom.mateRecentExpenses,
+  ].filter(expense => ['coffee', 'delivery', 'dining'].includes(expense.category)).length
+  const mateShoppingCount = [
+    ...myTodayExpenses,
+    ...mateRoom.mateRecentExpenses,
+  ].filter(expense => expense.category === 'shopping').length
+  const mateFoodProps = Math.min(3, mateFoodCount)
+  const mateShoppingProps = Math.min(3, mateShoppingCount)
   // 설문 결과 미리보기 (결과 화면용)
   const surveyResultType = surveyAnswers.length === onboardingQuestions.length
     ? scoreSpendingType(surveyAnswers)
@@ -913,6 +1001,31 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('companion-name'), companionName), [companionName, userHash])
   useEffect(() => saveJson(k('owned-companions'), ownedCompanions), [ownedCompanions, userHash])
   useEffect(() => saveJson(k('ui-theme'), themeId), [themeId, userHash])
+  useEffect(() => saveJson(k('mate-room'), mateRoom), [mateRoom, userHash])
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+    void loadMateRoom().then(room => {
+      if (!room) return
+      setMateRoom(current => ({ ...current, roomId: room.roomId, mateName: room.mateName }))
+    }).catch(() => {})
+  }, [userHash])
+  useEffect(() => {
+    if (!mateRoom.roomId || !isSupabaseConfigured) return
+    const timer = window.setTimeout(() => {
+      void syncMateDay(mateRoom.roomId!, expenses, mateRoom.shareDetails).catch(() => {})
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [mateRoom.roomId, mateRoom.shareDetails, expenses])
+  useEffect(() => {
+    if (!mateRoom.roomId || !isSupabaseConfigured) return
+    let alive = true
+    const refresh = () => void loadMateActivity(mateRoom.roomId!).then(activity => {
+      if (alive) setMateRoom(current => ({ ...current, ...activity }))
+    }).catch(() => {})
+    refresh()
+    const timer = window.setInterval(refresh, 10_000)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [mateRoom.roomId])
   // 탭·FAB·칩 CSS 변수 + TDS 버튼(brandPrimaryColor)이 같은 테마를 쓰도록 html에 반영
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeId)
@@ -1238,6 +1351,53 @@ function PocketApp({ userHash }: { userHash: string }) {
     .filter(expense => listCategory === 'all' || expense.category === listCategory)
     .sort((a, b) => Date.parse(b.spentAt) - Date.parse(a.spentAt))
   const listTotal = visibleListExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const reportMonthExpenses = useMemo(() => expenses.filter(expense => {
+    const spent = new Date(expense.spentAt)
+    return spent.getFullYear() === listYear && spent.getMonth() === listMonth
+  }), [expenses, listYear, listMonth])
+  const previousReportDate = new Date(listYear, listMonth - 1, 1)
+  const previousMonthExpenses = useMemo(() => expenses.filter(expense => {
+    const spent = new Date(expense.spentAt)
+    return spent.getFullYear() === previousReportDate.getFullYear() && spent.getMonth() === previousReportDate.getMonth()
+  }), [expenses, previousReportDate.getFullYear(), previousReportDate.getMonth()])
+  const reportTotal = reportMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const previousReportTotal = previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const reportChange = previousReportTotal > 0
+    ? Math.round(((reportTotal - previousReportTotal) / previousReportTotal) * 100)
+    : null
+  const reportCategoryRows = categories
+    .map(info => ({
+      ...info,
+      amount: reportMonthExpenses.filter(expense => expense.category === info.value).reduce((sum, expense) => sum + expense.amount, 0),
+    }))
+    .filter(row => row.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+  const reportDayTotals = reportMonthExpenses.reduce<Record<string, number>>((totals, expense) => {
+    const key = dateKey(new Date(expense.spentAt))
+    totals[key] = (totals[key] ?? 0) + expense.amount
+    return totals
+  }, {})
+  const reportTopDay = Object.entries(reportDayTotals).sort((a, b) => b[1] - a[1])[0]
+  const reportDaysInMonth = new Date(listYear, listMonth + 1, 0).getDate()
+  const reportMonthStart = new Date(listYear, listMonth, 1)
+  const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const reportElapsedDays = reportMonthStart > currentMonthStart
+    ? 0
+    : reportMonthStart.getTime() === currentMonthStart.getTime()
+      ? new Date().getDate()
+      : reportDaysInMonth
+  const reportNoSpendDays = Math.max(0, reportElapsedDays - Object.keys(reportDayTotals).length)
+  const reportDailyAverage = reportElapsedDays > 0 ? Math.round(reportTotal / reportElapsedDays) : 0
+  const reportBudgetRatio = snapshot.spendableBudget > 0 ? Math.round((reportTotal / snapshot.spendableBudget) * 100) : 0
+  const reportComment = reportMonthExpenses.length === 0
+    ? '아직 기록이 없어요. 한 건부터 모으면 소비 습관이 보여요.'
+    : reportBudgetRatio > 100
+      ? '생활예산을 넘겼어요. 다음 결제 전에 한 번만 저랑 눈 마주쳐요.'
+      : reportChange !== null && reportChange <= -10
+        ? `지난달보다 ${Math.abs(reportChange)}% 줄였어요. 이번 달은 제가 칭찬할게요.`
+        : reportCategoryRows[0]
+          ? `${reportCategoryRows[0].label}에 가장 많이 썼어요. 만족도도 1등이었는지 확인해 봐요.`
+          : '이번 달 소비 흐름은 아직 조용해요.'
   const periodLabel = listPeriod === 'yearly'
     ? `${listYear}년`
     : listPeriod === 'monthly'
@@ -1372,10 +1532,9 @@ function PocketApp({ userHash }: { userHash: string }) {
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
-  const useOutfit = (outfit: typeof dogOutfits[number]) => {
-    // 코스튬은 기본 눈찌(강아지)일 때만 구매·착용 가능
-    if (companionId !== 'nunchi') {
-      setMessage('코스튬은 잔액지킴이(강아지)일 때만 쓸 수 있어요.')
+  const useOutfit = (outfit: typeof characterOutfits[number]) => {
+    if (outfit.companionId !== null && outfit.companionId !== companionId) {
+      setMessage('지금 선택한 눈찌가 입을 수 없는 코스튬이에요.')
       return
     }
     if (outfitInventory.includes(outfit.id)) {
@@ -1456,8 +1615,8 @@ function PocketApp({ userHash }: { userHash: string }) {
     const mate = companions.find(item => item.id === id) ?? companions[0]
     const applyEquip = () => {
       setCompanionId(id)
-      // 강아지가 아니면 코스튬 상태맵을 쓰지 않으므로 맨몸(none)으로 맞춤
-      if (id !== 'nunchi' && equippedOutfit !== 'none') {
+      // 눈찌마다 체형이 달라 전용 옷만 쓸 수 있으므로 교체할 때 맨몸으로 맞춤
+      if (id !== companionId && equippedOutfit !== 'none') {
         setEquippedOutfit('none')
       }
     }
@@ -1565,11 +1724,120 @@ function PocketApp({ userHash }: { userHash: string }) {
     setThemeId(id)
     setMessage(`${THEME_OPTIONS.find(item => item.id === id)?.label ?? ''} 테마로 바꿨어요.`)
   }
+  const makeMateInvite = async () => {
+    if (!isSupabaseConfigured) return setMessage('Supabase 환경변수를 먼저 연결해 주세요.')
+    try {
+      const created = await createMateRoom(companionName)
+      setMateRoom(current => ({ ...current, roomId: created.roomId, inviteCode: created.code }))
+      setMessage(`초대 코드 ${created.code}를 만들었어요.`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '초대 코드를 만들지 못했어요.')
+    }
+  }
+  const joinMateRoom = async () => {
+    const code = mateCodeInput.trim().toUpperCase()
+    if (!/^[A-Z0-9]{6}$/.test(code)) return setMessage('6자리 초대 코드를 확인해 주세요.')
+    try {
+      const joined = await acceptMateInvite(code, companionName)
+      setMateRoom(current => ({ ...current, roomId: joined.roomId, inviteCode: code, mateName: '친구 눈찌' }))
+      setMateCodeInput('')
+      setMessage('둘만의 공동룸을 만들었어요.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '공동룸에 참여하지 못했어요.')
+    }
+  }
+  const sendMateReaction = async (text: MateReaction) => {
+    if (!mateRoom.mateName) return setMessage('먼저 친구를 초대해 주세요.')
+    if (!mateRoom.roomId) return setMessage('공동룸 연결을 다시 확인해 주세요.')
+    try {
+      await sendMateReactionToRoom(mateRoom.roomId, text)
+    } catch (error) {
+      return setMessage(error instanceof Error ? error.message : '반응을 보내지 못했어요.')
+    }
+    setMateRoom(current => ({
+      ...current,
+      reactions: [
+        { id: crypto.randomUUID(), from: 'me' as const, text, createdAt: new Date().toISOString() },
+        ...current.reactions,
+      ].slice(0, 8),
+    }))
+    setMessage(`${text} 반응을 보냈어요.`)
+  }
+  const selectMateTheme = async (theme: MateTheme) => {
+    if (!mateRoom.roomId) return setMessage('공동룸 연결을 다시 확인해 주세요.')
+    const previous = mateRoom.theme
+    setMateRoom(current => ({ ...current, theme }))
+    try {
+      await updateMateRoomTheme(mateRoom.roomId, theme)
+      setMessage(`${theme === 'christmas' ? '크리스마스' : '캠핑'} 공동룸으로 바꿨어요.`)
+    } catch (error) {
+      setMateRoom(current => ({ ...current, theme: previous }))
+      setMessage(error instanceof Error ? error.message : '공동룸 테마를 바꾸지 못했어요.')
+    }
+  }
+  const openSupportEmail = () => {
+    const subject = encodeURIComponent('[눈찌주는 가계부] 문의 및 의견')
+    const body = encodeURIComponent(`문의 내용을 작성해 주세요.\n\n앱 버전: v${__APP_VERSION__}\n사용 기기: `)
+    window.location.href = `mailto:khnam022@naver.com?subject=${subject}&body=${body}`
+  }
+  const copySupportEmail = async () => {
+    try {
+      await navigator.clipboard.writeText('khnam022@naver.com')
+      setMessage('문의 이메일 주소를 복사했어요.')
+    } catch {
+      setMessage('이메일 주소: khnam022@naver.com')
+    }
+  }
+  const issueBackupCode = async () => {
+    setBackupBusy(true)
+    try {
+      const code = await createPersonalBackup(userHash)
+      setBackupCode(code)
+      setMessage('새 개인 백업 코드를 만들었어요. 안전한 곳에 보관해 주세요.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '백업을 만들지 못했어요.')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+  const copyBackupCode = async () => {
+    if (!backupCode) return
+    try {
+      await navigator.clipboard.writeText(backupCode)
+      setMessage('개인 백업 코드를 복사했어요.')
+    } catch {
+      setMessage('코드를 길게 눌러 직접 복사해 주세요.')
+    }
+  }
+  const restoreBackup = async () => {
+    if (!backupCodeInput.trim()) return setMessage('개인 백업 코드를 입력해 주세요.')
+    setBackupBusy(true)
+    try {
+      await restorePersonalBackup(userHash, backupCodeInput)
+      setMessage('복원이 끝났어요. 데이터를 다시 불러올게요.')
+      window.setTimeout(() => window.location.reload(), 600)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '백업을 복원하지 못했어요.')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
 
   return (
     <TDSMobileAITProvider brandPrimaryColor={themePrimary}>
     <main className="app-shell">
       <div className="hero-room">
+        <button
+          className="settings-button"
+          type="button"
+          aria-label="설정 열기"
+          onClick={() => setActivePanel(activePanel === 'settings' ? 'expense' : 'settings')}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 7.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+        </button>
         <section
           className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
           style={{ '--wear': Math.max(0, Math.min(1, 1 - snapshot.remainingRatio)) } as CSSProperties}
@@ -1596,7 +1864,7 @@ function PocketApp({ userHash }: { userHash: string }) {
           >
             {bubbleVisible && (
               <div
-                className={`speech ${bubbleKind === 'nudge' ? 'is-nudge' : 'is-talk'}`}
+                className={`speech ${bubbleKind === 'nudge' ? 'is-nudge' : 'is-talk'} ${wander.left >= 52 ? 'opens-left' : 'opens-right'}`}
                 aria-live="polite"
               >
                 <p className="speech-text">{dogLine || line}</p>
@@ -1827,22 +2095,194 @@ function PocketApp({ userHash }: { userHash: string }) {
         </section>
       )}
 
+      {activePanel === 'mates' && (
+        <section className="panel-card mate-panel">
+          <ListHeader
+            title={<ListHeader.TitleParagraph>같이 아끼는 방</ListHeader.TitleParagraph>}
+            right={<ListHeader.RightText>하루 {won(DAILY_MATE_LIMIT)}원</ListHeader.RightText>}
+          />
+          {!mateRoom.mateName ? (
+            <div className="panel-body mate-invite-card">
+              <div className="mate-room-preview" aria-hidden="true">
+                <span>🐶</span><b>+</b><span className="mate-empty">?</span>
+              </div>
+              <h3>친구 눈찌를 초대해요</h3>
+              <p>초대 코드를 수락한 두 사람만 오늘의 합산 금액과 공유한 소비 내용을 볼 수 있어요.</p>
+              {mateRoom.inviteCode ? (
+                <button
+                  type="button"
+                  className="invite-code"
+                  onClick={() => void navigator.clipboard?.writeText(mateRoom.inviteCode)}
+                >
+                  <small>내 초대 코드 · 눌러서 복사</small>
+                  <strong>{mateRoom.inviteCode}</strong>
+                </button>
+              ) : (
+                <Button display="block" size="large" color="primary" onClick={makeMateInvite}>초대 코드 만들기</Button>
+              )}
+              <div className="mate-code-entry">
+                <input
+                  value={mateCodeInput}
+                  onChange={event => setMateCodeInput(event.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase())}
+                  placeholder="받은 코드 6자리"
+                  aria-label="친구 초대 코드"
+                />
+                <button type="button" onClick={joinMateRoom}>참여</button>
+              </div>
+              <p className="mate-consent-note">참여하면 오늘의 합산 소비와 공유 설정을 켠 소비 메모가 서로에게 보여요.</p>
+            </div>
+          ) : (
+            <div className="panel-body">
+              <div className="mate-theme-picker" role="radiogroup" aria-label="공동룸 테마">
+                <button type="button" role="radio" aria-checked={mateRoom.theme === 'christmas'} className={mateRoom.theme === 'christmas' ? 'active' : ''} onClick={() => void selectMateTheme('christmas')}>크리스마스</button>
+                <button type="button" role="radio" aria-checked={mateRoom.theme === 'camping'} className={mateRoom.theme === 'camping' ? 'active' : ''} onClick={() => void selectMateTheme('camping')}>캠핑</button>
+              </div>
+              <div className={`party-room theme-${mateRoom.theme} ${mateMissionComplete ? 'is-calm' : 'is-alert'}`}>
+                <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room.png`} alt={`${mateRoom.theme === 'christmas' ? '크리스마스 통창 라운지' : '모닥불 캠핑장'} 공동룸`} />
+                <div className="party-consumption-props" aria-hidden="true">
+                  {Array.from({ length: mateFoodProps }, (_, index) => <img className="party-food-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/food.png`} alt="" key={`mate-food-${index}`} />)}
+                  {Array.from({ length: mateShoppingProps }, (_, index) => <img className="party-shopping-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/shopping.png`} alt="" key={`mate-shopping-${index}`} />)}
+                </div>
+                <div className="party-mates" aria-label={`${companionName}와 ${mateRoom.mateName}의 공동룸`}>
+                  <div><img src={displayDogImage} alt={companionName} /><span>{companionName}</span></div>
+                  <div><span className="friend-nunchi" aria-hidden="true">●ᴥ●</span><span>{mateRoom.mateName}</span></div>
+                </div>
+                <p>{mateMissionComplete ? '둘 다 오늘 예산 안에서 잘 쓰는 중' : '오늘 한도를 살짝 넘긴 눈찌가 있어요'}</p>
+              </div>
+
+              <div className="mate-total-card">
+                <small>오늘 둘이 쓴 돈</small>
+                <strong>{won(todaySpent + mateRoom.mateSpentToday)}원</strong>
+                <span>{won(DAILY_MATE_LIMIT * 2)}원 중 {won(Math.max(0, DAILY_MATE_LIMIT * 2 - todaySpent - mateRoom.mateSpentToday))}원 남음</span>
+              </div>
+
+              <div className="mate-progress-list">
+                <div className={todaySpent > DAILY_MATE_LIMIT ? 'is-over' : ''}>
+                  <p><b>{companionName}</b><span>{won(todaySpent)}원</span></p>
+                  <i><em style={{ width: `${myMateProgress}%` }} /></i>
+                </div>
+                <div className={mateRoom.mateSpentToday > DAILY_MATE_LIMIT ? 'is-over' : ''}>
+                  <p><b>{mateRoom.mateName}</b><span>{won(mateRoom.mateSpentToday)}원</span></p>
+                  <i><em style={{ width: `${friendMateProgress}%` }} /></i>
+                </div>
+              </div>
+
+              <label className="mate-share-toggle">
+                <span><b>소비 내용 공유</b><small>카테고리와 내가 적은 사용처만 보여요</small></span>
+                <input
+                  type="checkbox"
+                  checked={mateRoom.shareDetails}
+                  onChange={event => setMateRoom(current => ({ ...current, shareDetails: event.target.checked }))}
+                />
+              </label>
+
+              {mateRoom.shareDetails && (
+                <div className="mate-feed">
+                  <h3>오늘 뭐 썼지?</h3>
+                  {expenses
+                    .filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
+                    .slice(0, 4)
+                    .map(expense => (
+                      <div key={expense.id}>
+                        <span>{categoryInfo(expense.category).emoji}</span>
+                        <p><b>{expense.memo || categoryInfo(expense.category).label}</b><small>{companionName}</small></p>
+                        <strong>{won(expense.amount)}원</strong>
+                      </div>
+                    ))}
+                  {todayExpenseCount === 0 && <p className="mate-empty-copy">아직 오늘 기록한 소비가 없어요.</p>}
+                  {mateRoom.mateRecentExpenses.map((expense, index) => (
+                    <div key={`mate-${index}-${expense.category}-${expense.amount}`}>
+                      <span>{categoryInfo(expense.category).emoji}</span>
+                      <p><b>{expense.memo || categoryInfo(expense.category).label}</b><small>{mateRoom.mateName}</small></p>
+                      <strong>{won(expense.amount)}원</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mate-reactions">
+                <h3>눈찌 반응 보내기</h3>
+                <div>{mateReactions.map(reaction => <button type="button" key={reaction} onClick={() => void sendMateReaction(reaction)}>{reaction}</button>)}</div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {activePanel === 'history' && (
         <section className="panel-card">
           <ListHeader
             title={<ListHeader.TitleParagraph>소비 내역</ListHeader.TitleParagraph>}
             right={<ListHeader.RightText>{expenses.length}건</ListHeader.RightText>}
           />
-          <div className="segment">
+          <div className="segment three">
             <button className={historyView === 'calendar' ? 'active' : ''} onClick={() => setHistoryView('calendar')} type="button">
               달력
             </button>
             <button className={historyView === 'list' ? 'active' : ''} onClick={() => setHistoryView('list')} type="button">
               리스트
             </button>
+            <button className={historyView === 'report' ? 'active' : ''} onClick={() => setHistoryView('report')} type="button">
+              리포트
+            </button>
           </div>
 
-          {historyView === 'calendar' ? (
+          {historyView === 'report' ? (
+            <div className="spending-report">
+              <div className="calendar-head">
+                <button onClick={() => { const prev = new Date(listYear, listMonth - 1, 1); setListYear(prev.getFullYear()); setListMonth(prev.getMonth()) }} aria-label="이전 달" type="button">‹</button>
+                <strong>{listYear}년 {listMonth + 1}월 소비 리포트</strong>
+                <button onClick={() => { const next = new Date(listYear, listMonth + 1, 1); setListYear(next.getFullYear()); setListMonth(next.getMonth()) }} aria-label="다음 달" type="button">›</button>
+              </div>
+
+              <div className="report-hero">
+                <span>이번 달 총지출</span>
+                <strong>{won(reportTotal)}원</strong>
+                <p>
+                  {reportChange === null
+                    ? '지난달 비교 데이터가 아직 없어요'
+                    : reportChange === 0
+                      ? '지난달과 같은 금액이에요'
+                      : `지난달보다 ${Math.abs(reportChange)}% ${reportChange > 0 ? '더 썼어요' : '덜 썼어요'}`}
+                </p>
+                <div className="report-budget-track" aria-label={`생활예산의 ${reportBudgetRatio}% 사용`}>
+                  <i style={{ width: `${Math.min(100, reportBudgetRatio)}%` }} />
+                </div>
+                <small>생활예산의 {reportBudgetRatio}% 사용</small>
+              </div>
+
+              <div className="report-stats">
+                <article><span>하루 평균</span><b>{won(reportDailyAverage)}원</b></article>
+                <article><span>무지출 일수</span><b>{reportNoSpendDays}일</b></article>
+                <article><span>기록 건수</span><b>{reportMonthExpenses.length}건</b></article>
+                <article><span>가장 많이 쓴 날</span><b>{reportTopDay ? `${Number(reportTopDay[0].slice(-2))}일` : '-'}</b></article>
+              </div>
+
+              <section className="report-section">
+                <h3>어디에 많이 썼을까?</h3>
+                {reportCategoryRows.length === 0 ? (
+                  <p className="empty">분석할 소비 기록이 없어요.</p>
+                ) : reportCategoryRows.map(row => {
+                  const ratio = reportTotal > 0 ? Math.round((row.amount / reportTotal) * 100) : 0
+                  return (
+                    <div className="report-category" key={row.value}>
+                      <span className="category-icon">{row.emoji}</span>
+                      <div>
+                        <p><b>{row.label}</b><small>{ratio}%</small></p>
+                        <i><em style={{ width: `${ratio}%` }} /></i>
+                      </div>
+                      <strong>{won(row.amount)}원</strong>
+                    </div>
+                  )
+                })}
+              </section>
+
+              <div className="report-comment">
+                <img src={activeCompanion.states.neutral} alt="" />
+                <p><b>{companionName}의 한마디</b>{reportComment}</p>
+              </div>
+            </div>
+          ) : historyView === 'calendar' ? (
             <>
               <div className="period-pickers" aria-label="달력 연월 선택">
                 <label>
@@ -2095,25 +2535,6 @@ function PocketApp({ userHash }: { userHash: string }) {
             {spendingType ? ` (설문 ${companions.find(item => item.id === spendingType)?.title})` : ''}
             . 방·코스튬·눈찌를 바꿀 수 있어요.
           </p>
-          <div className="panel-body theme-section">
-            <p className="expense-section-label">UI 색상</p>
-            <div className="theme-picker" role="radiogroup" aria-label="UI 테마 색상">
-              {THEME_OPTIONS.map(theme => (
-                <button
-                  key={theme.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={themeId === theme.id}
-                  className={`theme-swatch ${themeId === theme.id ? 'is-active' : ''}`}
-                  onClick={() => selectTheme(theme.id)}
-                >
-                  <i className={`theme-swatch-dot is-${theme.id}`} aria-hidden="true" />
-                  <span>{theme.label}</span>
-                </button>
-              ))}
-            </div>
-            <p className="theme-picker-hint">버튼·탭·강조색 등 앱 전체 UI 색을 바꿉니다.</p>
-          </div>
           <div className="segment three">
             <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')} type="button">
               방 스킨
@@ -2154,19 +2575,12 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : shopTab === 'outfits' ? (
             <div className="skin-grid outfit-grid">
-              {companionId !== 'nunchi' && (
-                <p className="shop-lock-hint">
-                  코스튬은 <b>잔액지킴이(강아지)</b>일 때만 구매·착용할 수 있어요.
-                  눈찌 탭에서 강아지로 바꾼 뒤 이용해 주세요.
-                </p>
-              )}
-              {dogOutfits.map(outfit => {
+              {availableOutfits.map(outfit => {
                 const owned = outfitInventory.includes(outfit.id)
                 const equipped = equippedOutfit === outfit.id
-                const outfitLocked = companionId !== 'nunchi'
                 return (
-                  <article key={outfit.id} className={`${equipped ? 'equipped' : ''}${outfitLocked ? ' is-locked' : ''}`}>
-                    <img src={outfit.image ?? '/assets/characters/states/dog-neutral.png'} alt={outfit.name} />
+                  <article key={outfit.id} className={equipped ? 'equipped' : ''}>
+                    <img src={outfit.image ?? activeCompanion.states.neutral} alt={outfit.name} />
                     <div>
                       <h3>{outfit.name}</h3>
                       <p>{outfit.description}</p>
@@ -2177,12 +2591,10 @@ function PocketApp({ userHash }: { userHash: string }) {
                       size="small"
                       color={equipped ? 'dark' : 'primary'}
                       variant={equipped ? 'weak' : 'fill'}
-                      disabled={equipped || outfitLocked}
+                      disabled={equipped}
                       onClick={() => useOutfit(outfit)}
                     >
-                      {outfitLocked
-                        ? '강아지 전용'
-                        : equipped
+                      {equipped
                           ? '착용 중'
                           : owned
                             ? '착용하기'
@@ -2278,13 +2690,95 @@ function PocketApp({ userHash }: { userHash: string }) {
         </section>
       )}
 
+      {activePanel === 'settings' && (
+        <section className="panel-card settings-panel">
+          <ListHeader
+            title={<ListHeader.TitleParagraph>설정</ListHeader.TitleParagraph>}
+            right={<ListHeader.RightText>눈찌주는 가계부</ListHeader.RightText>}
+          />
+
+          <section className="settings-section">
+            <h3>화면 테마</h3>
+            <p>버튼과 강조색을 취향대로 바꿔요.</p>
+            <div className="theme-picker" role="radiogroup" aria-label="UI 테마 색상">
+              {THEME_OPTIONS.map(theme => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={themeId === theme.id}
+                  className={`theme-swatch ${themeId === theme.id ? 'is-active' : ''}`}
+                  onClick={() => selectTheme(theme.id)}
+                >
+                  <i className={`theme-swatch-dot is-${theme.id}`} aria-hidden="true" />
+                  <span>{theme.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <button className="settings-row" type="button" onClick={() => setGuideExpanded(value => !value)} aria-expanded={guideExpanded}>
+              <span><b>사용법 보기</b><small>처음 시작하는 순서를 확인해요.</small></span>
+              <strong>{guideExpanded ? '접기' : '보기'}</strong>
+            </button>
+            {guideExpanded && (
+              <ol className="inline-guide">
+                <li><i>1</i><p><b>눈찌 고르기</b><span>꾸미기에서 함께할 눈찌를 선택하고 이름을 붙여요.</span></p></li>
+                <li><i>2</i><p><b>생활예산 설정</b><span>월급에서 고정비와 저축 목표를 빼 실제로 쓸 돈을 정해요.</span></p></li>
+                <li><i>3</i><p><b>소비 기록</b><span>종류와 금액을 기록하면 눈찌와 방이 소비에 반응해요.</span></p></li>
+                <li><i>4</i><p><b>리포트 확인</b><span>내역의 리포트에서 지난달 비교와 소비 비중을 확인해요.</span></p></li>
+              </ol>
+            )}
+          </section>
+
+          <section className="settings-section">
+            <button className="settings-row" type="button" onClick={openSupportEmail}>
+              <span><b>문의 또는 의견 보내기</b><small>메일 앱에서 내용을 작성해 보내요.</small></span>
+              <strong>메일 열기</strong>
+            </button>
+            <div className="support-email">
+              <span>khnam022@naver.com</span>
+              <button type="button" onClick={copySupportEmail}>주소 복사</button>
+            </div>
+          </section>
+
+          <section className="settings-section backup-section">
+            <h3>개인 백업</h3>
+            <p>기기를 바꾸거나 앱 데이터가 지워졌을 때 이 코드로 복원할 수 있어요.</p>
+            <button className="settings-row" type="button" disabled={backupBusy} onClick={() => void issueBackupCode()}>
+              <span><b>새 백업 코드 만들기</b><small>현재 데이터를 암호화해서 1년간 보관해요.</small></span>
+              <strong>{backupBusy ? '처리 중' : '발급'}</strong>
+            </button>
+            {backupCode && (
+              <div className="backup-code-box">
+                <code>{backupCode}</code>
+                <button type="button" onClick={() => void copyBackupCode()}>코드 복사</button>
+              </div>
+            )}
+            <div className="backup-restore-row">
+              <input
+                value={backupCodeInput}
+                onChange={event => setBackupCodeInput(event.target.value)}
+                placeholder="NUN-으로 시작하는 백업 코드"
+                aria-label="개인 백업 코드"
+              />
+              <button type="button" disabled={backupBusy} onClick={() => void restoreBackup()}>복원</button>
+            </div>
+            <p className="backup-warning">이 코드는 비밀번호와 같아요. 다른 사람에게 보내지 말고, 잃어버리면 복구할 수 없어요.</p>
+          </section>
+
+          <p className="app-version">눈찌주는 가계부 · v{__APP_VERSION__}</p>
+        </section>
+      )}
+
       {message && (
         <p className="toast" role="status">
           {message}
         </p>
       )}
 
-      {!expenseSheetOpen && (
+      {!expenseSheetOpen && activePanel !== 'settings' && (
         <button
           className="fab-add"
           type="button"
@@ -2469,6 +2963,10 @@ function PocketApp({ userHash }: { userHash: string }) {
             </svg>
           </span>
           <span className="tab-label">내역</span>
+        </button>
+        <button className={activePanel === 'mates' ? 'active' : ''} onClick={() => setActivePanel('mates')} type="button">
+          <span className="tab-icon" aria-hidden="true">♡</span>
+          <span className="tab-label">같이</span>
         </button>
         <button className={activePanel === 'shop' ? 'active' : ''} onClick={() => setActivePanel('shop')} type="button">
           <span className="tab-icon" aria-hidden="true">

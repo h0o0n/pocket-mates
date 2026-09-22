@@ -346,6 +346,245 @@ update public.shop_items set slot = case id
   else slot end
 where item_type = 'decoration';
 
+-- 암호화 개인 백업: 내용은 클라이언트에서 AES-GCM으로 암호화한 뒤 저장합니다.
+create table if not exists public.encrypted_backups (
+  id text primary key check (id ~ '^[A-Za-z0-9_-]{22}$'),
+  owner_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  ciphertext text not null,
+  iv text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '365 days')
+);
+
+alter table public.encrypted_backups enable row level security;
+revoke all on public.encrypted_backups from anon, authenticated;
+grant insert, select, delete on public.encrypted_backups to authenticated;
+
+drop policy if exists "encrypted_backups_insert_own" on public.encrypted_backups;
+create policy "encrypted_backups_insert_own" on public.encrypted_backups
+  for insert to authenticated with check (owner_id = (select auth.uid()));
+drop policy if exists "encrypted_backups_select_own" on public.encrypted_backups;
+create policy "encrypted_backups_select_own" on public.encrypted_backups
+  for select to authenticated using (owner_id = (select auth.uid()));
+drop policy if exists "encrypted_backups_delete_own" on public.encrypted_backups;
+create policy "encrypted_backups_delete_own" on public.encrypted_backups
+  for delete to authenticated using (owner_id = (select auth.uid()));
+
+-- 새 익명 계정에서도 복구 코드의 무작위 id를 아는 경우 암호문만 읽습니다.
+-- 복호화 키는 DB에 저장하지 않고 복구 코드 뒤쪽에만 존재합니다.
+create or replace function public.read_encrypted_backup(p_id text)
+returns table (ciphertext text, iv text)
+language sql security definer set search_path = ''
+as $$
+  select b.ciphertext, b.iv
+  from public.encrypted_backups b
+  where b.id = p_id and b.expires_at > now();
+$$;
+
+revoke all on function public.read_encrypted_backup(text) from public, anon;
+grant execute on function public.read_encrypted_backup(text) to authenticated;
+
+-- v2.1 둘만의 공동룸
+-- 실제 결제 원문은 공유하지 않고, 사용자가 공개한 합계·카테고리·메모만 별도 저장합니다.
+create table if not exists public.mate_rooms (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id) on delete cascade,
+  name text not null default '같이 아끼는 방' check (char_length(name) between 1 and 30),
+  daily_limit bigint not null default 15000 check (daily_limit between 1000 and 1000000),
+  shared_points bigint not null default 0 check (shared_points >= 0),
+  created_at timestamptz not null default now()
+);
+alter table public.mate_rooms
+  add column if not exists theme text not null default 'christmas'
+  check (theme in ('christmas', 'camping'));
+
+create table if not exists public.mate_room_members (
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  share_details boolean not null default true,
+  joined_at timestamptz not null default now(),
+  primary key (room_id, user_id)
+);
+alter table public.mate_room_members
+  add column if not exists display_name text not null default '눈찌'
+  check (char_length(display_name) between 1 and 20);
+
+create table if not exists public.mate_invites (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  inviter_id uuid not null references auth.users (id) on delete cascade,
+  code text not null unique check (code ~ '^[A-Z0-9]{6}$'),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'expired', 'revoked')),
+  expires_at timestamptz not null default (now() + interval '7 days'),
+  accepted_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.mate_daily_summaries (
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  summary_date date not null default current_date,
+  total_spent bigint not null default 0 check (total_spent >= 0),
+  category_totals jsonb not null default '{}'::jsonb check (jsonb_typeof(category_totals) = 'object'),
+  updated_at timestamptz not null default now(),
+  primary key (room_id, user_id, summary_date),
+  foreign key (room_id, user_id) references public.mate_room_members (room_id, user_id) on delete cascade
+);
+
+create table if not exists public.mate_shared_expenses (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  category text not null check (category in ('coffee','delivery','dining','transport','shopping','game','subscription','living','other')),
+  amount bigint not null check (amount > 0),
+  memo text check (memo is null or char_length(memo) <= 40),
+  spent_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  foreign key (room_id, user_id) references public.mate_room_members (room_id, user_id) on delete cascade
+);
+
+create table if not exists public.mate_reactions (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  reaction text not null check (reaction in ('잘 참는 중', '눈찌가 보고 있다', '오늘도 같이 가자')),
+  created_at timestamptz not null default now(),
+  foreign key (room_id, sender_id) references public.mate_room_members (room_id, user_id) on delete cascade
+);
+
+create or replace function private.is_mate_room_member(p_room_id uuid)
+returns boolean language sql stable security definer set search_path = ''
+as $$
+  select exists (
+    select 1 from public.mate_room_members
+    where room_id = p_room_id and user_id = auth.uid()
+  );
+$$;
+
+alter table public.mate_rooms enable row level security;
+alter table public.mate_room_members enable row level security;
+alter table public.mate_invites enable row level security;
+alter table public.mate_daily_summaries enable row level security;
+alter table public.mate_shared_expenses enable row level security;
+alter table public.mate_reactions enable row level security;
+
+revoke all on public.mate_rooms, public.mate_room_members, public.mate_invites from anon, authenticated;
+grant select on public.mate_rooms to authenticated;
+grant select on public.mate_room_members to authenticated;
+grant select, insert, update, delete on public.mate_daily_summaries to authenticated;
+grant select, insert, update, delete on public.mate_shared_expenses to authenticated;
+grant select, insert, delete on public.mate_reactions to authenticated;
+
+drop policy if exists "mate_rooms_members_only" on public.mate_rooms;
+drop policy if exists "mate_rooms_create_own" on public.mate_rooms;
+drop policy if exists "mate_members_members_only" on public.mate_room_members;
+drop policy if exists "mate_members_join_self" on public.mate_room_members;
+drop policy if exists "mate_members_leave_self" on public.mate_room_members;
+drop policy if exists "mate_invites_owner_manage" on public.mate_invites;
+drop policy if exists "mate_summaries_members_read" on public.mate_daily_summaries;
+drop policy if exists "mate_summaries_write_own" on public.mate_daily_summaries;
+drop policy if exists "mate_expenses_members_read" on public.mate_shared_expenses;
+drop policy if exists "mate_expenses_write_own" on public.mate_shared_expenses;
+drop policy if exists "mate_reactions_members_read" on public.mate_reactions;
+drop policy if exists "mate_reactions_send_own" on public.mate_reactions;
+
+create policy "mate_rooms_members_only" on public.mate_rooms for select to authenticated
+  using (private.is_mate_room_member(id));
+create policy "mate_rooms_create_own" on public.mate_rooms for insert to authenticated
+  with check (owner_id = (select auth.uid()));
+create policy "mate_members_members_only" on public.mate_room_members for select to authenticated
+  using (private.is_mate_room_member(room_id));
+create policy "mate_members_join_self" on public.mate_room_members for insert to authenticated
+  with check (user_id = (select auth.uid()));
+create policy "mate_members_leave_self" on public.mate_room_members for delete to authenticated
+  using (user_id = (select auth.uid()));
+create policy "mate_invites_owner_manage" on public.mate_invites for all to authenticated
+  using (inviter_id = (select auth.uid())) with check (inviter_id = (select auth.uid()));
+create policy "mate_summaries_members_read" on public.mate_daily_summaries for select to authenticated
+  using (private.is_mate_room_member(room_id));
+create policy "mate_summaries_write_own" on public.mate_daily_summaries for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy "mate_expenses_members_read" on public.mate_shared_expenses for select to authenticated
+  using (private.is_mate_room_member(room_id));
+create policy "mate_expenses_write_own" on public.mate_shared_expenses for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy "mate_reactions_members_read" on public.mate_reactions for select to authenticated
+  using (private.is_mate_room_member(room_id));
+create policy "mate_reactions_send_own" on public.mate_reactions for insert to authenticated
+  with check (sender_id = (select auth.uid()) and private.is_mate_room_member(room_id));
+
+revoke all on function private.is_mate_room_member(uuid) from public, anon;
+grant execute on function private.is_mate_room_member(uuid) to authenticated;
+
+create or replace function public.create_mate_room(p_display_name text default '눈찌')
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_room public.mate_rooms;
+  v_code text;
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if exists (select 1 from public.mate_room_members where user_id = auth.uid()) then
+    raise exception '이미 참여 중인 공동룸이 있습니다.';
+  end if;
+  insert into public.mate_rooms (owner_id) values (auth.uid()) returning * into v_room;
+  insert into public.mate_room_members (room_id, user_id, display_name)
+  values (v_room.id, auth.uid(), left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20));
+  loop
+    v_code := upper(substr(encode(extensions.gen_random_bytes(4), 'hex'), 1, 6));
+    exit when not exists (select 1 from public.mate_invites where code = v_code and status = 'pending');
+  end loop;
+  insert into public.mate_invites (room_id, inviter_id, code)
+  values (v_room.id, auth.uid(), v_code);
+  return jsonb_build_object('roomId', v_room.id, 'code', v_code);
+end;
+$$;
+
+create or replace function public.accept_mate_invite(p_code text, p_display_name text default '눈찌')
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_invite public.mate_invites;
+  v_count integer;
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  select * into v_invite from public.mate_invites
+  where code = upper(trim(p_code)) and status = 'pending' and expires_at > now()
+  for update;
+  if not found then raise exception '유효하지 않거나 만료된 코드입니다.'; end if;
+  if v_invite.inviter_id = auth.uid() then raise exception '내 초대 코드에는 참여할 수 없습니다.'; end if;
+  if exists (select 1 from public.mate_room_members where user_id = auth.uid()) then
+    raise exception '이미 참여 중인 공동룸이 있습니다.';
+  end if;
+  select count(*) into v_count from public.mate_room_members where room_id = v_invite.room_id;
+  if v_count >= 2 then raise exception '이미 두 명이 참여한 공동룸입니다.'; end if;
+  insert into public.mate_room_members (room_id, user_id, display_name)
+  values (v_invite.room_id, auth.uid(), left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20));
+  update public.mate_invites set status = 'accepted', accepted_by = auth.uid() where id = v_invite.id;
+  return jsonb_build_object('roomId', v_invite.room_id, 'joined', true);
+end;
+$$;
+
+revoke all on function public.create_mate_room(text) from public, anon;
+revoke all on function public.accept_mate_invite(text, text) from public, anon;
+grant execute on function public.create_mate_room(text) to authenticated;
+grant execute on function public.accept_mate_invite(text, text) to authenticated;
+
+create or replace function public.set_mate_room_theme(p_room_id uuid, p_theme text)
+returns text language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if p_theme not in ('christmas', 'camping') then raise exception '지원하지 않는 테마입니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 바꿀 수 있습니다.'; end if;
+  update public.mate_rooms set theme = p_theme where id = p_room_id;
+  return p_theme;
+end;
+$$;
+
+revoke all on function public.set_mate_room_theme(uuid, text) from public, anon;
+grant execute on function public.set_mate_room_theme(uuid, text) to authenticated;
+
 insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement, slot)
 values
   ('furniture-bed', 'decoration', 'retro', '포근한 침대', '방의 절반을 차지하는 행복', 0, '/assets/flat/items/furniture-bed.svg', 0, 0, '{}', 'seating'),

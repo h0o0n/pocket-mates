@@ -8,7 +8,7 @@
     "build": "npm run build --prefix web && ait build",
     "test": "npm run test:logic --prefix web",
     "preview": "npm run preview --prefix web",
-    "deploy": "ait deploy"
+    "deploy": "npm run build && ait deploy"
   },
   "engines": {
     "node": ">=20"

@@ -1,6 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import aitDevtools from "@apps-in-toss/devtools/unplugin";
+import { readFileSync } from "node:fs";
+
+const rootPackage = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 /**
  * 앱인토스 WebView 배포용 Vite 설정
@@ -9,5 +14,8 @@ import aitDevtools from "@apps-in-toss/devtools/unplugin";
  */
 export default defineConfig({
   base: "./",
+  define: {
+    __APP_VERSION__: JSON.stringify(rootPackage.version),
+  },
   plugins: [aitDevtools.vite(), react()],
 });

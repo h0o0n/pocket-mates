@@ -19,11 +19,23 @@
 ### 1. 상태와 파일 규격
 
 - 각 동물은 `neutral`, `chubby`, `very-chubby`, `receipt`, `eating` 5상태를 모두 준비합니다.
+- 각 눈찌 전용 코스튬도 반드시 같은 5상태를 한 세트로 준비합니다. `neutral` 한 장만 만들고 다른 상태에 재사용하지 않습니다.
 - 파일명은 **동물 영문 접두사** + 상태입니다. 예: `bear-neutral.png`, `raccoon-chubby.png`, `seal-receipt.png`.
 - 접두사 매핑: `foodie`→`bear`, `shopper`→`raccoon`, `subscriber`→`seal`, `_archive/capybara`→`capybara`.
 - 상태 5종: `neutral`, `chubby`, `very-chubby`, `receipt`, `eating`.
 - 곰·너구리는 누끼 복원본의 원본 해상도인 `1254×1254`, 물개는 `1024×1024`입니다. 같은 동물의 5상태는 해상도를 통일하며, 정사각형 비율과 화면 내 표시 크기를 유지합니다. 생성 결과를 불필요하게 재샘플링하지 않습니다.
 - 포즈와 소품은 눈찌의 같은 상태를 기준으로 맞추되, 동물의 얼굴과 실루엣은 상태 사이에서 동일하게 유지합니다.
+
+### 1-1. 전용 코스튬 폴더
+
+- 경로: `{companionId}/outfits/{outfit-slug}/{animal}-{state}.png`
+- 예: `foodie/outfits/gingham-bib/bear-receipt.png`
+- 각 눈찌는 전용 코스튬 3벌을 사용합니다.
+  - 곰: `gingham-bib`, `honey-cape`, `cook-apron`
+  - 너구리: `courier-vest`, `navy-hoodie`, `coral-satchel`
+  - 물개: `sailor-collar`, `lavender-sleep`, `mint-headphones`
+- 코스튬은 해당 눈찌의 얼굴·몸·꼬리·상태 소품을 다시 디자인하지 않고 옷만 덧입힌 통짜 PNG입니다.
+- 상점은 현재 선택된 눈찌의 전용 코스튬만 노출합니다. 다른 눈찌의 코스튬을 공용으로 연결하지 않습니다.
 
 ### 2. 투명 배경과 누끼
 
