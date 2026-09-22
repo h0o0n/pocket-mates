@@ -1177,7 +1177,7 @@ function PocketApp({ userHash }: { userHash: string }) {
               },
             },
           }))
-          if (result.new) setMessage('오늘 둘이 한도 지키기 성공! 함께 쓰는 공간이 자랐어요.')
+          if (result.new) setMessage('오늘 둘이 미션 성공! 새로운 장식이 가까워졌어요.')
         })
         .catch(() => {})
     }, 500)
@@ -2395,7 +2395,7 @@ function PocketApp({ userHash }: { userHash: string }) {
               <div className="mate-level-card">
                 <p><b>함께 꾸미기 {mateRoom.roomLevel}단계</b><span>{mateRoom.successDays}일 성공</span></p>
                 <i><em style={{ width: `${mateLevelProgress}%` }} /></i>
-                <small>{mateRoom.roomLevel >= 4 ? '함께 쓰는 공간을 완성했어요.' : `${nextMateLevelDays - mateRoom.successDays}일 더 성공하면 다음 단계`}</small>
+                <small>{mateRoom.roomLevel >= 4 ? '소품과 장식을 모두 모았어요.' : `${nextMateLevelDays - mateRoom.successDays}일 더 성공하면 장식이 늘어나요`}</small>
               </div>
 
               <div className={`mate-daily-challenge ${mateMissionComplete ? 'is-safe' : 'is-over'}`}>
@@ -2916,18 +2916,20 @@ function PocketApp({ userHash }: { userHash: string }) {
           ) : shopTab === 'together' && mateRoom.mateName ? (
             <div className="together-theme-shop">
               <p className="shop-lock-hint">
-                테마마다 미션 성공 일수와 성장 단계가 따로 쌓여요. 다른 테마로 바꿔도 이전 진행도는 그대로 남아요.
+                매일 둘이 미션을 성공하면 선택한 공간에 소품과 장식이 늘어나요. 테마를 바꿔도 모아 둔 장식은 그대로 남아요.
               </p>
               {(['christmas', 'camping'] as MateTheme[]).map(theme => {
                 const progress = mateRoom.themeProgress[theme]
                 const active = mateRoom.theme === theme
                 const title = theme === 'christmas' ? '크리스마스' : '캠프파이어'
+                const nextDecorationDay = progress.roomLevel === 1 ? 3 : progress.roomLevel === 2 ? 7 : 14
+                const daysUntilDecoration = Math.max(0, nextDecorationDay - progress.successDays)
                 return (
                   <article className={`together-theme-card ${active ? 'equipped' : ''}`} key={theme}>
                     <img src={`/assets/rooms/shared/${theme}/room-level-${progress.roomLevel}.png`} alt={`${title} ${progress.roomLevel}단계`} />
                     <div>
                       <p><b>{title}</b><span>{progress.roomLevel}단계 · {progress.successDays}일 성공</span></p>
-                      <small>{progress.roomLevel >= 4 ? '완성된 테마예요.' : `${progress.roomLevel === 1 ? 3 : progress.roomLevel === 2 ? 7 : 14}일 성공하면 다음 모습으로 변해요.`}</small>
+                      <small>{progress.roomLevel >= 4 ? '소품과 장식을 모두 모았어요.' : `${daysUntilDecoration}일 더 성공하면 새로운 장식이 생겨요.`}</small>
                     </div>
                     <Button display="block" size="small" color={active ? 'dark' : 'primary'} variant={active ? 'weak' : 'fill'} disabled={active} onClick={() => void selectMateTheme(theme)}>
                       {active ? '사용 중' : progress.successDays > 0 ? '이어하기' : '새로 시작'}
