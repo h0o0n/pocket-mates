@@ -556,7 +556,7 @@ declare
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
   if exists (select 1 from public.mate_room_members where user_id = auth.uid()) then
-    raise exception '이미 참여 중인 공동룸이 있습니다.';
+    raise exception '이미 다른 친구와 연결되어 있습니다.';
   end if;
   insert into public.mate_rooms (owner_id) values (auth.uid()) returning * into v_room;
   insert into public.mate_room_members (room_id, user_id, display_name)
@@ -585,10 +585,10 @@ begin
   if not found then raise exception '유효하지 않거나 만료된 코드입니다.'; end if;
   if v_invite.inviter_id = auth.uid() then raise exception '내 초대 코드에는 참여할 수 없습니다.'; end if;
   if exists (select 1 from public.mate_room_members where user_id = auth.uid()) then
-    raise exception '이미 참여 중인 공동룸이 있습니다.';
+    raise exception '이미 다른 친구와 연결되어 있습니다.';
   end if;
   select count(*) into v_count from public.mate_room_members where room_id = v_invite.room_id;
-  if v_count >= 2 then raise exception '이미 두 명이 참여한 공동룸입니다.'; end if;
+  if v_count >= 2 then raise exception '이미 두 명이 연결되어 있습니다.'; end if;
   insert into public.mate_room_members (room_id, user_id, display_name)
   values (v_invite.room_id, auth.uid(), left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20));
   update public.mate_invites set status = 'accepted', accepted_by = auth.uid() where id = v_invite.id;
@@ -607,7 +607,7 @@ as $$
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
   if p_theme not in ('christmas', 'camping') then raise exception '지원하지 않는 테마입니다.'; end if;
-  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 바꿀 수 있습니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 바꿀 수 있습니다.'; end if;
   update public.mate_rooms set theme = p_theme where id = p_room_id;
   return p_theme;
 end;
@@ -630,7 +630,7 @@ returns boolean language plpgsql security definer set search_path = ''
 as $$
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
-  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 변경할 수 있습니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 변경할 수 있습니다.'; end if;
   if p_companion_id not in ('nunchi', 'foodie', 'shopper', 'subscriber') then raise exception '지원하지 않는 눈찌입니다.'; end if;
   if p_visual_state not in ('neutral', 'chubby', 'very-chubby', 'receipt', 'eating') then raise exception '지원하지 않는 상태입니다.'; end if;
   update public.mate_room_members
@@ -655,7 +655,7 @@ declare
   v_pick integer;
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
-  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 확인할 수 있습니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 확인할 수 있습니다.'; end if;
   v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || p_date::text, 0) % 4);
   return case v_pick
     when 0 then jsonb_build_object('type','each_limit','title','둘 다 15,000원 이하로 쓰기','goal',15000)
@@ -684,7 +684,7 @@ declare
   v_inserted integer;
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
-  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 완료할 수 있습니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '연결된 사용자만 완료할 수 있습니다.'; end if;
   select daily_limit into v_limit from public.mate_rooms where id = p_room_id for update;
   select count(*) into v_member_count from public.mate_room_members where room_id = p_room_id;
   if v_member_count <> 2 then
@@ -737,7 +737,7 @@ returns boolean language plpgsql security definer set search_path = ''
 as $$
 begin
   if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
-  if not private.is_mate_room_member(p_room_id) then raise exception '참여 중인 공동룸이 아닙니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '연결된 친구가 없습니다.'; end if;
   -- 2인 전용 팀룸이므로 한 명이 나가면 방과 공유 데이터 전체를 종료합니다.
   delete from public.mate_rooms where id = p_room_id;
   return true;

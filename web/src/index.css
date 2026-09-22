@@ -150,7 +150,7 @@ body.is-expense-sheet-open .app-shell {
   z-index: 20;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: min(184px, 52%);
+  width: min(160px, 48%);
   margin: 0 auto 9px;
   padding: 3px;
   border-radius: 999px;

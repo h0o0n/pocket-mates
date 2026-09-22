@@ -1165,7 +1165,7 @@ function PocketApp({ userHash }: { userHash: string }) {
             successDays: result.successDays ?? current.successDays,
             roomLevel: result.roomLevel ?? current.roomLevel,
           }))
-          if (result.new) setMessage('오늘 둘이 한도 지키기 성공! 공동룸이 자랐어요.')
+          if (result.new) setMessage('오늘 둘이 한도 지키기 성공! 함께 쓰는 공간이 자랐어요.')
         })
         .catch(() => {})
     }, 500)
@@ -1935,14 +1935,14 @@ function PocketApp({ userHash }: { userHash: string }) {
       const joined = await acceptMateInvite(code, companionName)
       setMateRoom(current => ({ ...current, roomId: joined.roomId, inviteCode: code, mateName: '친구 눈찌' }))
       setMateCodeInput('')
-      setMessage('둘만의 공동룸을 만들었어요.')
+      setMessage('친구와 연결됐어요.')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '공동룸에 참여하지 못했어요.')
+      setMessage(error instanceof Error ? error.message : '친구와 연결하지 못했어요.')
     }
   }
   const sendMateReaction = async (text: MateReaction) => {
     if (!mateRoom.mateName) return setMessage('먼저 친구를 초대해 주세요.')
-    if (!mateRoom.roomId) return setMessage('공동룸 연결을 다시 확인해 주세요.')
+    if (!mateRoom.roomId) return setMessage('친구 연결 상태를 다시 확인해 주세요.')
     try {
       await sendMateReactionToRoom(mateRoom.roomId, text)
     } catch (error) {
@@ -1958,21 +1958,21 @@ function PocketApp({ userHash }: { userHash: string }) {
     setMessage(`${text} 반응을 보냈어요.`)
   }
   const selectMateTheme = async (theme: MateTheme) => {
-    if (!mateRoom.roomId) return setMessage('공동룸 연결을 다시 확인해 주세요.')
+    if (!mateRoom.roomId) return setMessage('친구 연결 상태를 다시 확인해 주세요.')
     const previous = mateRoom.theme
     setMateRoom(current => ({ ...current, theme }))
     try {
       await updateMateRoomTheme(mateRoom.roomId, theme)
-      setMessage(`${theme === 'christmas' ? '크리스마스' : '캠핑'} 공동룸으로 바꿨어요.`)
+      setMessage(`${theme === 'christmas' ? '크리스마스' : '캠핑'} 테마로 바꿨어요.`)
     } catch (error) {
       setMateRoom(current => ({ ...current, theme: previous }))
-      setMessage(error instanceof Error ? error.message : '공동룸 테마를 바꾸지 못했어요.')
+      setMessage(error instanceof Error ? error.message : '함께 보기 테마를 바꾸지 못했어요.')
     }
   }
   const openTeamRoom = () => {
     if (!mateRoom.mateName) {
       setActivePanel('mates')
-      setMessage('친구를 초대하면 메인에서 팀룸을 볼 수 있어요.')
+      setMessage('친구를 초대하면 두 눈찌를 함께 볼 수 있어요.')
       return
     }
     setRoomView('team')
@@ -1984,9 +1984,9 @@ function PocketApp({ userHash }: { userHash: string }) {
       setMateRoom(defaultMateRoom)
       setRoomView('personal')
       setLeaveMateConfirm(false)
-      setMessage('팀룸에서 나왔어요. 공유 데이터도 함께 종료됐어요.')
+      setMessage('친구 연결을 끊었어요. 공유 데이터도 함께 종료됐어요.')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '팀룸에서 나가지 못했어요.')
+      setMessage(error instanceof Error ? error.message : '친구 연결을 끊지 못했어요.')
     }
   }
   const openSupportEmail = () => {
@@ -2034,8 +2034,8 @@ function PocketApp({ userHash }: { userHash: string }) {
     <main className="app-shell">
       <div className="hero-room">
         <div className="room-view-switch" role="tablist" aria-label="방 전환">
-          <button type="button" role="tab" aria-selected={roomView === 'personal'} className={roomView === 'personal' ? 'active' : ''} onClick={() => setRoomView('personal')}>개인룸</button>
-          <button type="button" role="tab" aria-selected={roomView === 'team'} className={roomView === 'team' ? 'active' : ''} onClick={openTeamRoom}>팀룸</button>
+          <button type="button" role="tab" aria-selected={roomView === 'personal'} className={roomView === 'personal' ? 'active' : ''} onClick={() => setRoomView('personal')}>혼자</button>
+          <button type="button" role="tab" aria-selected={roomView === 'team'} className={roomView === 'team' ? 'active' : ''} onClick={openTeamRoom}>같이</button>
         </div>
         {roomView === 'personal' ? (
         <section
@@ -2095,8 +2095,8 @@ function PocketApp({ userHash }: { userHash: string }) {
           </div>
         </section>
         ) : mateRoom.mateName ? (
-          <section className={`main-team-room party-room theme-${mateRoom.theme} ${mateMissionComplete ? 'is-calm' : 'is-alert'}`} aria-label={`${companionName}와 ${mateRoom.mateName}의 팀룸`}>
-            <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room-level-${mateRoom.roomLevel}.png`} alt={`${mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} ${mateRoom.roomLevel}단계 팀룸`} />
+          <section className={`main-team-room party-room theme-${mateRoom.theme} ${mateMissionComplete ? 'is-calm' : 'is-alert'}`} aria-label={`${companionName}와 ${mateRoom.mateName} 함께 보기`}>
+            <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room-level-${mateRoom.roomLevel}.png`} alt={`${mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} 함께 꾸미기 ${mateRoom.roomLevel}단계`} />
             <div className="party-consumption-props" aria-hidden="true">
               {Array.from({ length: mateFoodProps }, (_, index) => <img className="party-food-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/food.png`} alt="" key={`main-team-food-${index}`} />)}
               {Array.from({ length: mateShoppingProps }, (_, index) => <img className="party-shopping-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/shopping.png`} alt="" key={`main-team-shopping-${index}`} />)}
@@ -2113,7 +2113,7 @@ function PocketApp({ userHash }: { userHash: string }) {
         ) : (
           <section className="team-room-empty">
             <span aria-hidden="true">🐶　＋　?</span>
-            <b>아직 팀룸이 없어요</b>
+            <b>아직 연결된 친구가 없어요</b>
             <button type="button" onClick={() => setActivePanel('mates')}>친구 초대하기</button>
           </section>
         )}
@@ -2356,19 +2356,19 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : (
             <div className="panel-body">
-              <div className="mate-theme-picker" role="radiogroup" aria-label="공동룸 테마">
+              <div className="mate-theme-picker" role="radiogroup" aria-label="함께 보기 테마">
                 <button type="button" role="radio" aria-checked={mateRoom.theme === 'christmas'} className={mateRoom.theme === 'christmas' ? 'active' : ''} onClick={() => void selectMateTheme('christmas')}>크리스마스</button>
                 <button type="button" role="radio" aria-checked={mateRoom.theme === 'camping'} className={mateRoom.theme === 'camping' ? 'active' : ''} onClick={() => void selectMateTheme('camping')}>캠핑</button>
               </div>
               <button type="button" className="open-main-team-room" onClick={() => { setRoomView('team'); setActivePanel('expense') }}>
                 <span><b>{companionName} + {mateRoom.mateName}</b><small>{mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} · {mateRoom.roomLevel}단계</small></span>
-                <strong>메인 팀룸 보기</strong>
+                <strong>함께 보기</strong>
               </button>
 
               <div className="mate-level-card">
-                <p><b>공동룸 {mateRoom.roomLevel}단계</b><span>{mateRoom.successDays}일 성공</span></p>
+                <p><b>함께 꾸미기 {mateRoom.roomLevel}단계</b><span>{mateRoom.successDays}일 성공</span></p>
                 <i><em style={{ width: `${mateLevelProgress}%` }} /></i>
-                <small>{mateRoom.roomLevel >= 4 ? '공동룸을 완성했어요.' : `${nextMateLevelDays - mateRoom.successDays}일 더 성공하면 다음 단계`}</small>
+                <small>{mateRoom.roomLevel >= 4 ? '함께 쓰는 공간을 완성했어요.' : `${nextMateLevelDays - mateRoom.successDays}일 더 성공하면 다음 단계`}</small>
               </div>
 
               <div className={`mate-daily-challenge ${mateMissionComplete ? 'is-safe' : 'is-over'}`}>
@@ -2435,10 +2435,10 @@ function PocketApp({ userHash }: { userHash: string }) {
 
               <div className="mate-danger-zone">
                 {!leaveMateConfirm ? (
-                  <button type="button" className="mate-leave-button" onClick={() => setLeaveMateConfirm(true)}>팀룸 나가기</button>
+                  <button type="button" className="mate-leave-button" onClick={() => setLeaveMateConfirm(true)}>친구 연결 끊기</button>
                 ) : (
                   <div className="mate-leave-confirm" role="alert">
-                    <p><b>정말 팀룸에서 나갈까요?</b><span>한 명이 나가면 두 사람의 팀룸과 공유 기록이 모두 종료돼요.</span></p>
+                    <p><b>정말 친구 연결을 끊을까요?</b><span>한 명이 끊으면 둘이 공유하던 기록도 함께 종료돼요.</span></p>
                     <div>
                       <button type="button" onClick={() => setLeaveMateConfirm(false)}>취소</button>
                       <button type="button" className="danger" onClick={() => void confirmLeaveMateRoom()}>나가기</button>
