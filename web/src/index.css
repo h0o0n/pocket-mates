@@ -1362,13 +1362,6 @@ body.is-expense-sheet-open .app-shell {
 .talk-hint {
   display: none;
 }
-.dog-wrap.is-wandering.is-moving .dog-art {
-  animation: dog-walk-bob 0.85s ease-in-out infinite;
-}
-@keyframes dog-walk-bob {
-  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
-  50% { transform: translateY(-5px) rotate(1.5deg); }
-}
 .dog-wrap.is-busy .dog-facing { transform: none !important; }
 .dog-wrap.motion-eat .dog-art { animation: dog-eat 2.4s ease-in-out both; }
 .dog-wrap.motion-hop .dog-art { animation: dog-hop 1.2s ease-in-out both; }
@@ -1397,7 +1390,6 @@ body.is-expense-sheet-open .app-shell {
 @media (prefers-reduced-motion: reduce) {
   .room-breathe,
   .dog-wrap,
-  .dog-wrap.is-wandering.is-moving .dog-art,
   .dog-wrap.motion-eat .dog-art,
   .dog-wrap.motion-hop .dog-art,
   .dog-wrap.motion-nod .dog-art {

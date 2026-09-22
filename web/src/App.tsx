@@ -934,10 +934,6 @@ function PocketApp({ userHash }: { userHash: string }) {
   // 눈찌 짧은 모션 / 식비 랜덤 음식 연출 (PNG + CSS만 사용)
   const [dogMotion, setDogMotion] = useState<DogMotion | null>(null)
   const [activeSnack, setActiveSnack] = useState<(typeof snackBites)[number] | null>(null)
-  // 방 안 랜덤 배회로: 목표 좌표를 골라 천천히 이동합니다.
-  const [wander, setWander] = useState({ left: 50, bottom: -2, facing: 1 as 1 | -1, moving: false, duration: 3.2 })
-  // 같이방 상대 눈찌도 동일한 배회 모션을 씁니다.
-  const [mateWander, setMateWander] = useState({ left: 68, bottom: -2, facing: -1 as 1 | -1, moving: false, duration: 3.4 })
   const motionTimer = useRef(0)
   const snackTimer = useRef(0)
   const nudgeTimer = useRef(0)
@@ -1437,87 +1433,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [bubbleVisible])
-
-  // 특수 모션이 아닐 때 방 안 임의의 지점으로 천천히 걸어 다닙니다.
-  useEffect(() => {
-    if (dogMotion) {
-      setWander(current => ({ ...current, moving: false }))
-      return
-    }
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-    let cancelled = false
-    let timer = 0
-
-    const schedule = (delayMs: number, action: () => void) => {
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        if (!cancelled) action()
-      }, delayMs)
-    }
-
-    const roam = () => {
-      let travelMs = 3200
-      setWander(current => {
-        let left = 24 + Math.random() * 52
-        let bottom = -5 + Math.random() * 10
-        // 너무 가까운 지점은 다시 뽑아 어색한 제자리걸음을 줄입니다.
-        if (Math.abs(left - current.left) < 10) left = left > 50 ? left - 18 : left + 18
-        const duration = 2.6 + Math.random() * 2.4
-        travelMs = Math.round(duration * 1000)
-        const facing = (left >= current.left ? 1 : -1) as 1 | -1
-        return { left, bottom, facing, moving: true, duration }
-      })
-      schedule(travelMs, () => {
-        setWander(current => ({ ...current, moving: false }))
-        schedule(800 + Math.random() * 2800, roam)
-      })
-    }
-
-    schedule(600 + Math.random() * 900, roam)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [dogMotion])
-
-  // 같이방 상대 눈찌도 혼자 모드와 같은 방식으로 배회합니다.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-    let cancelled = false
-    let timer = 0
-
-    const schedule = (delayMs: number, action: () => void) => {
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        if (!cancelled) action()
-      }, delayMs)
-    }
-
-    const roam = () => {
-      let travelMs = 3200
-      setMateWander(current => {
-        let left = 24 + Math.random() * 52
-        let bottom = -5 + Math.random() * 10
-        if (Math.abs(left - current.left) < 10) left = left > 50 ? left - 18 : left + 18
-        const duration = 2.6 + Math.random() * 2.4
-        travelMs = Math.round(duration * 1000)
-        const facing = (left >= current.left ? 1 : -1) as 1 | -1
-        return { left, bottom, facing, moving: true, duration }
-      })
-      schedule(travelMs, () => {
-        setMateWander(current => ({ ...current, moving: false }))
-        schedule(800 + Math.random() * 2800, roam)
-      })
-    }
-
-    schedule(900 + Math.random() * 1200, roam)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [])
 
   /** PNG 캐릭터에 CSS 클래스만 잠깐 붙여 모션을 재생합니다. */
   const playDogMotion = (motion: DogMotion, durationMs = 1400) => {
@@ -2123,11 +2038,10 @@ function PocketApp({ userHash }: { userHash: string }) {
           </div>
           <div
             ref={dogAreaRef}
-            className={`dog-wrap ${dogMotion ? `is-busy motion-${dogMotion}` : `is-wandering ${wander.moving ? 'is-moving' : 'is-idle'}`}`}
+            className={`dog-wrap ${dogMotion ? `is-busy motion-${dogMotion}` : 'is-idle'}`}
             style={{
-              left: `${wander.left}%`,
-              bottom: `${wander.bottom}%`,
-              transitionDuration: dogMotion ? '0.35s' : `${wander.duration}s`,
+              left: '50%',
+              bottom: '-2%',
             }}
           >
             {bubbleVisible && (
@@ -2138,7 +2052,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                 <p className="speech-text">{dogLine || line}</p>
               </div>
             )}
-            <div className="dog-facing" style={{ transform: `scaleX(${wander.facing})` }}>
+            <div className="dog-facing">
               <div
                 className="dog-button"
                 role="button"
@@ -2187,11 +2101,10 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
             <div
               ref={dogAreaRef}
-              className={`dog-wrap party-mate-dog ${dogMotion ? `is-busy motion-${dogMotion}` : `is-wandering ${wander.moving ? 'is-moving' : 'is-idle'}`}`}
+              className={`dog-wrap party-mate-dog ${dogMotion ? `is-busy motion-${dogMotion}` : 'is-idle'}`}
               style={{
-                left: `${wander.left}%`,
-                bottom: `${wander.bottom}%`,
-                transitionDuration: dogMotion ? '0.35s' : `${wander.duration}s`,
+                left: '34%',
+                bottom: '-2%',
               }}
             >
               {bubbleVisible && (
@@ -2202,7 +2115,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                   <p className="speech-text">{dogLine || line}</p>
                 </div>
               )}
-              <div className="dog-facing" style={{ transform: `scaleX(${wander.facing})` }}>
+              <div className="dog-facing">
                 <div
                   className="dog-button"
                   role="button"
@@ -2227,15 +2140,14 @@ function PocketApp({ userHash }: { userHash: string }) {
               <span className="party-mate-label">{companionName}</span>
             </div>
             <div
-              className={`dog-wrap party-mate-dog is-wandering ${mateWander.moving ? 'is-moving' : 'is-idle'}`}
+              className="dog-wrap party-mate-dog is-idle"
               style={{
-                left: `${mateWander.left}%`,
-                bottom: `${mateWander.bottom}%`,
-                transitionDuration: `${mateWander.duration}s`,
+                left: '66%',
+                bottom: '-2%',
               }}
               aria-label={`${mateRoom.mateName} 눈찌`}
             >
-              <div className="dog-facing" style={{ transform: `scaleX(${mateWander.facing})` }}>
+              <div className="dog-facing" style={{ transform: 'scaleX(-1)' }}>
                 <img
                   className="dog-art"
                   src={mateDisplayImage}
