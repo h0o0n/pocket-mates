@@ -13,7 +13,7 @@ import {
 import { BannerAdSlot } from './components/BannerAdSlot.tsx'
 import { createPersonalBackup, restorePersonalBackup } from './lib/cloudBackup.ts'
 import { ensureAnonymousSession, isSupabaseConfigured } from './lib/supabase.ts'
-import { acceptMateInvite, createMateRoom, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateDay, updateMateRoomTheme } from './lib/mateRoom.ts'
+import { acceptMateInvite, completeMateDailyMission, createMateRoom, loadDailyMateMission, loadMateActivity, loadMateRoom, sendMateReactionToRoom, syncMateDay, updateMateRoomTheme, type DailyMateMission } from './lib/mateRoom.ts'
 import {
   loadJson,
   migrateLegacyKeys,
@@ -55,7 +55,7 @@ const roomImages = {
   speechless: '/assets/rooms/budget-states/attic-broke.png',
 } as const
 
-type SkinId = 'attic' | 'cloud' | 'game' | 'cafe' | 'library' | 'beach' | 'christmas' | 'camping'
+type SkinId = 'attic' | 'cafe' | 'beach'
 type OutfitId =
   | 'none' | 'scarf' | 'sweater' | 'raincoat'
   | 'bear-gingham-bib' | 'bear-honey-cape' | 'bear-cook-apron'
@@ -81,9 +81,12 @@ interface MateRoomState {
   mateSpentToday: number
   shareDetails: boolean
   mateRecentExpenses: Array<{ category: ExpenseCategory; amount: number; memo: string }>
+  mateCategoryTotals: Record<string, number>
   reactions: Array<{ id: string; from: 'me' | 'mate'; text: MateReaction; createdAt: string }>
   sharedNyam: number
   theme: MateTheme
+  successDays: number
+  roomLevel: number
 }
 
 const DAILY_MATE_LIMIT = 15_000
@@ -95,9 +98,12 @@ const defaultMateRoom: MateRoomState = {
   mateSpentToday: 0,
   shareDetails: true,
   mateRecentExpenses: [],
+  mateCategoryTotals: {},
   reactions: [],
   sharedNyam: 0,
   theme: 'christmas',
+  successDays: 0,
+  roomLevel: 1,
 }
 
 const THEME_OPTIONS: Array<{ id: ThemeId; label: string; primary: string }> = [
@@ -331,14 +337,21 @@ const companionOutfitStates = (
 
 const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
   { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
-  { id: 'cloud', name: '구름방', description: '구름이 보이는 말랑한 방', price: 250, image: '/assets/rooms/skins/cloud-dawn.png' },
-  { id: 'game', name: '주말 게임방', description: '잔액보다 세이브 파일이 중요한 방', price: 400, image: '/assets/rooms/skins/weekend-game.png' },
   { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png' },
-  { id: 'library', name: '조용한 도서관', description: '소비 충동을 책으로 덮는 방', price: 350, image: '/assets/rooms/skins/quiet-library.png' },
   { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png' },
-  { id: 'christmas', name: '크리스마스 거실', description: '트리 아래에서 잔액을 지키는 방', price: 500, image: '/assets/rooms/skins/christmas-nook.png' },
-  { id: 'camping', name: '숲속 캠핑', description: '텐트 안에서는 충동구매도 한숨 돌리는 방', price: 380, image: '/assets/rooms/skins/forest-camp.png' },
 ]
+
+const isSkinId = (value: unknown): value is SkinId =>
+  typeof value === 'string' && roomSkins.some(skin => skin.id === value)
+
+/** 삭제된 스킨(구름방 등)을 보유·장착 중이어도 다락방으로 정리 */
+const sanitizeSkinInventory = (raw: unknown): SkinId[] => {
+  const list = Array.isArray(raw) ? raw.filter(isSkinId) : []
+  return [...new Set<SkinId>(['attic', ...list])]
+}
+
+const sanitizeEquippedSkin = (raw: unknown): SkinId =>
+  (isSkinId(raw) ? raw : 'attic')
 
 /**
  * 캐릭터 코스튬 — 통짜 PNG 교체.
@@ -369,13 +382,104 @@ const characterOutfits: Array<{
   { id: 'seal-mint-headphones', companionId: 'subscriber', name: '정주행 헤드폰', description: '구독 콘텐츠를 끝까지 보는 민트 헤드폰', price: 220, image: '/assets/characters/companions/subscriber/outfits/mint-headphones/seal-neutral.png', states: companionOutfitStates('subscriber', 'seal', 'mint-headphones') },
 ]
 
-/** 식비 누적 시 랜덤하게 쌓이는 음식·배달 소품 (다양성 유지) */
-const foodProps = [
+/**
+ * 방 소품
+ * - 기본: 소비 기록만으로 쌓임 (구매 불필요)
+ * - 추가: 꾸미기에서 냠으로 사면, 같은 소비 기록 때 풀에 섞여 더 다양하게 쌓임
+ */
+type PropId =
+  | 'food-chicken'
+  | 'food-cafe'
+  | 'food-late-night'
+  | 'food-christmas-sweets'
+  | 'food-camp-mochi'
+  | 'parcel-christmas'
+  | 'parcel-camping'
+
+type PropKind = 'food' | 'parcel'
+
+/** 기본 음식 소품 — 카페·배달·외식 기록 시 항상 후보 */
+const BASE_FOOD_PROP_IMAGES = [
   '/assets/props/food/delivery-clutter.png',
-  '/assets/props/food/food-chicken.png',
-  '/assets/props/food/food-cafe.png',
-  '/assets/props/food/food-late-night.png',
 ] as const
+
+/** 기본 택배 소품 — 쇼핑 기록 시 항상 쌓임 */
+const BASE_PARCEL_PROP_IMAGES = [
+  '/assets/props/shopping/shopping-boxes.png',
+] as const
+
+/** 꾸미기에서 파는 추가 소품 (개인 방 소비 누적 풀에 합류) */
+const roomDecorProps: Array<{
+  id: PropId
+  kind: PropKind
+  name: string
+  description: string
+  price: number
+  image: string
+}> = [
+  {
+    id: 'food-chicken',
+    kind: 'food',
+    name: '치킨',
+    description: '식비 기록 시 랜덤으로 나와요.',
+    price: 80,
+    image: '/assets/props/food/food-chicken.png',
+  },
+  {
+    id: 'food-cafe',
+    kind: 'food',
+    name: '카페 음료',
+    description: '식비 기록 시 랜덤으로 나와요.',
+    price: 70,
+    image: '/assets/props/food/food-cafe.png',
+  },
+  {
+    id: 'food-late-night',
+    kind: 'food',
+    name: '야식',
+    description: '식비 기록 시 랜덤으로 나와요.',
+    price: 90,
+    image: '/assets/props/food/food-late-night.png',
+  },
+  {
+    id: 'food-christmas-sweets',
+    kind: 'food',
+    name: '크리스마스 디저트',
+    description: '식비 기록 시 랜덤으로 나와요.',
+    price: 120,
+    image: '/assets/rooms/shared/christmas/food.png',
+  },
+  {
+    id: 'food-camp-mochi',
+    kind: 'food',
+    name: '모찌 꼬치',
+    description: '식비 기록 시 랜덤으로 나와요.',
+    price: 110,
+    image: '/assets/rooms/shared/camping/food.png',
+  },
+  {
+    id: 'parcel-christmas',
+    kind: 'parcel',
+    name: '크리스마스 상자',
+    description: '쇼핑 기록 시 랜덤으로 나와요.',
+    price: 130,
+    image: '/assets/rooms/shared/christmas/shopping.png',
+  },
+  {
+    id: 'parcel-camping',
+    kind: 'parcel',
+    name: '캠핑 가방',
+    description: '쇼핑 기록 시 랜덤으로 나와요.',
+    price: 120,
+    image: '/assets/rooms/shared/camping/shopping.png',
+  },
+]
+
+const isPropId = (value: unknown): value is PropId =>
+  typeof value === 'string' && roomDecorProps.some(prop => prop.id === value)
+
+const sanitizePropList = (raw: unknown): PropId[] =>
+  Array.isArray(raw) ? [...new Set(raw.filter(isPropId))] : []
 
 /** 식비 기록 시 잠깐 보여 줄 랜덤 음식 연출 목록 */
 const snackBites = [
@@ -745,8 +849,9 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [dogLine, setDogLine] = useState('')
   const [bubbleKind, setBubbleKind] = useState<'nudge' | 'talk'>('talk')
   const [points, setPoints] = useState(() => loadJson(k('points'), 500))
-  const [inventory, setInventory] = useState<SkinId[]>(() => loadJson(k('inventory'), ['attic']))
-  const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => loadJson(k('equipped-skin'), 'attic'))
+  const [inventory, setInventory] = useState<SkinId[]>(() => sanitizeSkinInventory(loadJson(k('inventory'), ['attic'])))
+  const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => sanitizeEquippedSkin(loadJson(k('equipped-skin'), 'attic')))
+  const [propInventory, setPropInventory] = useState<PropId[]>(() => sanitizePropList(loadJson(k('prop-inventory'), [])))
   const [outfitInventory, setOutfitInventory] = useState<OutfitId[]>(() => loadJson(k('outfit-inventory'), ['none']))
   const [equippedOutfit, setEquippedOutfit] = useState<OutfitId>(() => loadJson(k('equipped-outfit'), 'none'))
   const [dailyTalks, setDailyTalks] = useState(() => loadJson(k(`talks-${period.todayKey}`), 0))
@@ -775,7 +880,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [listMonth, setListMonth] = useState(() => new Date().getMonth())
   const [listWeekKey, setListWeekKey] = useState(() => dateKey(startOfWeek(new Date())))
   const [listCategory, setListCategory] = useState<'all' | ExpenseCategory>('all')
-  const [shopTab, setShopTab] = useState<'rooms' | 'outfits' | 'companions'>('rooms')
+  const [shopTab, setShopTab] = useState<'rooms' | 'outfits' | 'companions' | 'props'>('rooms')
   // 온보딩: 소비 유형 설문 → 결과 → 이름 짓기
   const [onboardingDone, setOnboardingDone] = useState(() => loadJson(k('onboarding-done'), false))
   const [spendingType, setSpendingType] = useState<SpendingType | null>(() => loadJson(k('spending-type'), null))
@@ -801,6 +906,7 @@ function PocketApp({ userHash }: { userHash: string }) {
     ...loadJson(k('mate-room'), defaultMateRoom),
   }))
   const [mateCodeInput, setMateCodeInput] = useState('')
+  const [dailyMateMission, setDailyMateMission] = useState<DailyMateMission>({ type: 'each_limit', title: '둘 다 15,000원 이하로 쓰기', goal: 15_000 })
   const [backupCode, setBackupCode] = useState('')
   const [backupCodeInput, setBackupCodeInput] = useState('')
   const [backupBusy, setBackupBusy] = useState(false)
@@ -906,12 +1012,31 @@ function PocketApp({ userHash }: { userHash: string }) {
   const foodSpent = foodExpenses.reduce((sum, x) => sum + x.amount, 0)
   const foodExpenseCount = foodExpenses.length
   const shoppingCount = currentMonthExpenses.filter(x => x.category === 'shopping').length
+  // 기본 소품 + 구매한 추가 소품이 소비 기록에 따라 방에 쌓임 (구매만으로는 배치되지 않음)
+  const foodPropPool = [
+    ...BASE_FOOD_PROP_IMAGES,
+    ...roomDecorProps
+      .filter(prop => prop.kind === 'food' && propInventory.includes(prop.id))
+      .map(prop => prop.image),
+  ]
+  const parcelPropPool = [
+    ...BASE_PARCEL_PROP_IMAGES,
+    ...roomDecorProps
+      .filter(prop => prop.kind === 'parcel' && propInventory.includes(prop.id))
+      .map(prop => prop.image),
+  ]
   const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
   const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
-  // 같은 소비 시드면 항상 같은 음식 소품이 나와 다양성이 유지됩니다.
   const deliveryPiles = Array.from({ length: deliveryPileCount }, (_, index) => {
     const seedExpense = foodExpenses[index * 3 + 2] ?? foodExpenses[index * 3]
-    return foodProps[stableIndex(seedExpense?.id ?? String(index), foodProps.length)]
+    return foodPropPool[stableIndex(seedExpense?.id ?? String(index), foodPropPool.length)]
+  })
+  const shoppingExpenses = currentMonthExpenses
+    .filter(x => x.category === 'shopping')
+    .sort((a, b) => a.spentAt.localeCompare(b.spentAt))
+  const parcelPiles = Array.from({ length: parcelPileCount }, (_, index) => {
+    const seedExpense = shoppingExpenses[index * 3 + 2] ?? shoppingExpenses[index * 3]
+    return parcelPropPool[stableIndex(seedExpense?.id ?? String(index), parcelPropPool.length)]
   })
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const todaySpent = expenses
@@ -966,9 +1091,6 @@ function PocketApp({ userHash }: { userHash: string }) {
   const displayDogImage = dogStateMap[dogVisualState]
   const myMateProgress = Math.min(100, (todaySpent / DAILY_MATE_LIMIT) * 100)
   const friendMateProgress = Math.min(100, (mateRoom.mateSpentToday / DAILY_MATE_LIMIT) * 100)
-  const mateMissionComplete = Boolean(mateRoom.mateName)
-    && todaySpent <= DAILY_MATE_LIMIT
-    && mateRoom.mateSpentToday <= DAILY_MATE_LIMIT
   const myTodayExpenses = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
   const mateFoodCount = [
     ...myTodayExpenses,
@@ -980,6 +1102,18 @@ function PocketApp({ userHash }: { userHash: string }) {
   ].filter(expense => expense.category === 'shopping').length
   const mateFoodProps = Math.min(3, mateFoodCount)
   const mateShoppingProps = Math.min(3, mateShoppingCount)
+  const myCategoryTotal = (names: ExpenseCategory[]) => myTodayExpenses.filter(item => names.includes(item.category)).reduce((sum, item) => sum + item.amount, 0)
+  const missionCurrent = dailyMateMission.type === 'each_limit'
+    ? Math.max(todaySpent, mateRoom.mateSpentToday)
+    : dailyMateMission.type === 'combined_limit'
+      ? todaySpent + mateRoom.mateSpentToday
+      : dailyMateMission.type === 'food_limit'
+        ? myCategoryTotal(['coffee', 'delivery', 'dining']) + ['coffee', 'delivery', 'dining'].reduce((sum, key) => sum + Number(mateRoom.mateCategoryTotals[key] ?? 0), 0)
+        : myCategoryTotal(['shopping']) + Number(mateRoom.mateCategoryTotals.shopping ?? 0)
+  const mateMissionComplete = Boolean(mateRoom.mateName) && missionCurrent <= dailyMateMission.goal
+  const mateMissionProgress = Math.min(100, (missionCurrent / dailyMateMission.goal) * 100)
+  const nextMateLevelDays = mateRoom.roomLevel >= 4 ? 14 : mateRoom.roomLevel === 3 ? 14 : mateRoom.roomLevel === 2 ? 7 : 3
+  const mateLevelProgress = mateRoom.roomLevel >= 4 ? 100 : Math.min(100, (mateRoom.successDays / nextMateLevelDays) * 100)
   // 설문 결과 미리보기 (결과 화면용)
   const surveyResultType = surveyAnswers.length === onboardingQuestions.length
     ? scoreSpendingType(surveyAnswers)
@@ -993,6 +1127,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('points'), points), [points, userHash])
   useEffect(() => saveJson(k('inventory'), inventory), [inventory, userHash])
   useEffect(() => saveJson(k('equipped-skin'), equippedSkin), [equippedSkin, userHash])
+  useEffect(() => saveJson(k('prop-inventory'), propInventory), [propInventory, userHash])
   useEffect(() => saveJson(k('outfit-inventory'), outfitInventory), [outfitInventory, userHash])
   useEffect(() => saveJson(k('equipped-outfit'), equippedOutfit), [equippedOutfit, userHash])
   useEffect(() => saveJson(k('onboarding-done'), onboardingDone), [onboardingDone, userHash])
@@ -1006,13 +1141,24 @@ function PocketApp({ userHash }: { userHash: string }) {
     if (!isSupabaseConfigured) return
     void loadMateRoom().then(room => {
       if (!room) return
-      setMateRoom(current => ({ ...current, roomId: room.roomId, mateName: room.mateName }))
+      setMateRoom(current => ({ ...current, ...room }))
     }).catch(() => {})
   }, [userHash])
   useEffect(() => {
     if (!mateRoom.roomId || !isSupabaseConfigured) return
     const timer = window.setTimeout(() => {
-      void syncMateDay(mateRoom.roomId!, expenses, mateRoom.shareDetails).catch(() => {})
+      void syncMateDay(mateRoom.roomId!, expenses, mateRoom.shareDetails)
+        .then(() => completeMateDailyMission(mateRoom.roomId!))
+        .then(result => {
+          if (!result.completed) return
+          setMateRoom(current => ({
+            ...current,
+            successDays: result.successDays ?? current.successDays,
+            roomLevel: result.roomLevel ?? current.roomLevel,
+          }))
+          if (result.new) setMessage('오늘 둘이 한도 지키기 성공! 공동룸이 자랐어요.')
+        })
+        .catch(() => {})
     }, 500)
     return () => window.clearTimeout(timer)
   }, [mateRoom.roomId, mateRoom.shareDetails, expenses])
@@ -1026,6 +1172,10 @@ function PocketApp({ userHash }: { userHash: string }) {
     const timer = window.setInterval(refresh, 10_000)
     return () => { alive = false; window.clearInterval(timer) }
   }, [mateRoom.roomId])
+  useEffect(() => {
+    if (!mateRoom.roomId || !isSupabaseConfigured) return
+    void loadDailyMateMission(mateRoom.roomId).then(setDailyMateMission).catch(() => {})
+  }, [mateRoom.roomId, todayKey])
   // 탭·FAB·칩 CSS 변수 + TDS 버튼(brandPrimaryColor)이 같은 테마를 쓰도록 html에 반영
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeId)
@@ -1532,6 +1682,28 @@ function PocketApp({ userHash }: { userHash: string }) {
     setEquippedSkin(skin.id)
     setMessage(`${skin.name}을 구입하고 바로 적용했어요.`)
   }
+  /** 추가 소품 구매 — 바로 배치되지 않고, 관련 소비 기록 시 기본 소품 풀에 섞여 쌓임 */
+  const useProp = (prop: typeof roomDecorProps[number]) => {
+    if (propInventory.includes(prop.id)) {
+      setMessage(
+        prop.kind === 'parcel'
+          ? `${prop.name}은(는) 이미 있어요. 쇼핑 기록을 남기면 방에 섞여 나와요.`
+          : `${prop.name}은(는) 이미 있어요. 카페·배달·외식 기록을 남기면 방에 섞여 나와요.`,
+      )
+      return
+    }
+    if (points < prop.price) {
+      setMessage(`${prop.price - points}냠이 부족해요.`)
+      return
+    }
+    setPoints(current => current - prop.price)
+    setPropInventory(current => [...current, prop.id])
+    setMessage(
+      prop.kind === 'parcel'
+        ? `${prop.name} 추가 소품을 샀어요. 쇼핑 기록을 남기면 방에 더 다양하게 쌓여요.`
+        : `${prop.name} 추가 소품을 샀어요. 카페·배달·외식 기록을 남기면 방에 더 다양하게 쌓여요.`,
+    )
+  }
   const useOutfit = (outfit: typeof characterOutfits[number]) => {
     if (outfit.companionId !== null && outfit.companionId !== companionId) {
       setMessage('지금 선택한 눈찌가 입을 수 없는 코스튬이에요.')
@@ -1780,14 +1952,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     const body = encodeURIComponent(`문의 내용을 작성해 주세요.\n\n앱 버전: v${__APP_VERSION__}\n사용 기기: `)
     window.location.href = `mailto:khnam022@naver.com?subject=${subject}&body=${body}`
   }
-  const copySupportEmail = async () => {
-    try {
-      await navigator.clipboard.writeText('khnam022@naver.com')
-      setMessage('문의 이메일 주소를 복사했어요.')
-    } catch {
-      setMessage('이메일 주소: khnam022@naver.com')
-    }
-  }
   const issueBackupCode = async () => {
     setBackupBusy(true)
     try {
@@ -1827,17 +1991,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     <TDSMobileAITProvider brandPrimaryColor={themePrimary}>
     <main className="app-shell">
       <div className="hero-room">
-        <button
-          className="settings-button"
-          type="button"
-          aria-label="설정 열기"
-          onClick={() => setActivePanel(activePanel === 'settings' ? 'expense' : 'settings')}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M10 7.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-          </svg>
-        </button>
         <section
           className={`attic stage-${snapshot.stage} ${equippedSkin !== 'attic' ? 'custom-skin' : ''}`}
           style={{ '--wear': Math.max(0, Math.min(1, 1 - snapshot.remainingRatio)) } as CSSProperties}
@@ -1849,8 +2002,8 @@ function PocketApp({ userHash }: { userHash: string }) {
             {deliveryPiles.map((source, index) => (
               <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />
             ))}
-            {Array.from({ length: parcelPileCount }, (_, index) => (
-              <img className="room-prop parcel-prop" src="/assets/props/shopping/shopping-boxes.png" alt="" key={`shopping-${index}`} />
+            {parcelPiles.map((source, index) => (
+              <img className="room-prop parcel-prop" src={source} alt="" key={`shopping-${index}-${source}`} />
             ))}
           </div>
           <div
@@ -1864,7 +2017,7 @@ function PocketApp({ userHash }: { userHash: string }) {
           >
             {bubbleVisible && (
               <div
-                className={`speech ${bubbleKind === 'nudge' ? 'is-nudge' : 'is-talk'} ${wander.left >= 52 ? 'opens-left' : 'opens-right'}`}
+                className={`speech ${bubbleKind === 'nudge' ? 'is-nudge' : 'is-talk'}`}
                 aria-live="polite"
               >
                 <p className="speech-text">{dogLine || line}</p>
@@ -2099,7 +2252,7 @@ function PocketApp({ userHash }: { userHash: string }) {
         <section className="panel-card mate-panel">
           <ListHeader
             title={<ListHeader.TitleParagraph>같이 아끼는 방</ListHeader.TitleParagraph>}
-            right={<ListHeader.RightText>하루 {won(DAILY_MATE_LIMIT)}원</ListHeader.RightText>}
+            right={<ListHeader.RightText>매일 랜덤 미션</ListHeader.RightText>}
           />
           {!mateRoom.mateName ? (
             <div className="panel-body mate-invite-card">
@@ -2138,7 +2291,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                 <button type="button" role="radio" aria-checked={mateRoom.theme === 'camping'} className={mateRoom.theme === 'camping' ? 'active' : ''} onClick={() => void selectMateTheme('camping')}>캠핑</button>
               </div>
               <div className={`party-room theme-${mateRoom.theme} ${mateMissionComplete ? 'is-calm' : 'is-alert'}`}>
-                <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room.png`} alt={`${mateRoom.theme === 'christmas' ? '크리스마스 통창 라운지' : '모닥불 캠핑장'} 공동룸`} />
+                <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room-level-${mateRoom.roomLevel}.png`} onError={event => { event.currentTarget.src = `/assets/rooms/shared/${mateRoom.theme}/room.png` }} alt={`${mateRoom.theme === 'christmas' ? '크리스마스 통창 라운지' : '모닥불 캠핑장'} ${mateRoom.roomLevel}단계 공동룸`} />
                 <div className="party-consumption-props" aria-hidden="true">
                   {Array.from({ length: mateFoodProps }, (_, index) => <img className="party-food-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/food.png`} alt="" key={`mate-food-${index}`} />)}
                   {Array.from({ length: mateShoppingProps }, (_, index) => <img className="party-shopping-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/shopping.png`} alt="" key={`mate-shopping-${index}`} />)}
@@ -2147,7 +2300,20 @@ function PocketApp({ userHash }: { userHash: string }) {
                   <div><img src={displayDogImage} alt={companionName} /><span>{companionName}</span></div>
                   <div><span className="friend-nunchi" aria-hidden="true">●ᴥ●</span><span>{mateRoom.mateName}</span></div>
                 </div>
-                <p>{mateMissionComplete ? '둘 다 오늘 예산 안에서 잘 쓰는 중' : '오늘 한도를 살짝 넘긴 눈찌가 있어요'}</p>
+                <p>{mateMissionComplete ? '오늘 공동 미션 안에서 잘 쓰는 중' : '오늘 공동 미션 한도를 넘었어요'}</p>
+              </div>
+
+              <div className="mate-level-card">
+                <p><b>공동룸 {mateRoom.roomLevel}단계</b><span>{mateRoom.successDays}일 성공</span></p>
+                <i><em style={{ width: `${mateLevelProgress}%` }} /></i>
+                <small>{mateRoom.roomLevel >= 4 ? '공동룸을 완성했어요.' : `${nextMateLevelDays - mateRoom.successDays}일 더 성공하면 다음 단계`}</small>
+              </div>
+
+              <div className={`mate-daily-challenge ${mateMissionComplete ? 'is-safe' : 'is-over'}`}>
+                <p><b>오늘의 공동 미션</b><span>{mateMissionComplete ? '진행 중' : '한도 초과'}</span></p>
+                <strong>{dailyMateMission.title}</strong>
+                <i><em style={{ width: `${mateMissionProgress}%` }} /></i>
+                <small>{won(missionCurrent)}원 / {won(dailyMateMission.goal)}원 · 결과는 내일 확정돼요</small>
               </div>
 
               <div className="mate-total-card">
@@ -2533,14 +2699,17 @@ function PocketApp({ userHash }: { userHash: string }) {
           <p className="shop-guide">
             지금: {nunchiCallsign(companionName, activeCompanion.title)}
             {spendingType ? ` (설문 ${companions.find(item => item.id === spendingType)?.title})` : ''}
-            . 방·코스튬·눈찌를 바꿀 수 있어요.
+            . 방·코스튬·소품·눈찌를 바꿀 수 있어요.
           </p>
-          <div className="segment three">
+          <div className="segment four">
             <button className={shopTab === 'rooms' ? 'active' : ''} onClick={() => setShopTab('rooms')} type="button">
               방 스킨
             </button>
             <button className={shopTab === 'outfits' ? 'active' : ''} onClick={() => setShopTab('outfits')} type="button">
               코스튬
+            </button>
+            <button className={shopTab === 'props' ? 'active' : ''} onClick={() => setShopTab('props')} type="button">
+              소품
             </button>
             <button className={shopTab === 'companions' ? 'active' : ''} onClick={() => setShopTab('companions')} type="button">
               눈찌
@@ -2604,6 +2773,38 @@ function PocketApp({ userHash }: { userHash: string }) {
                 )
               })}
             </div>
+          ) : shopTab === 'props' ? (
+            <>
+              <p className="shop-lock-hint">
+                배달 봉투·택배 상자는 기본으로 쌓여요.
+                추가 소품을 사면 기록할 때 <b>랜덤</b>으로 더 나와요.
+              </p>
+              <div className="skin-grid outfit-grid prop-grid">
+                {roomDecorProps.map(prop => {
+                  const owned = propInventory.includes(prop.id)
+                  return (
+                    <article key={prop.id} className={owned ? 'equipped' : ''}>
+                      <img src={prop.image} alt={prop.name} />
+                      <div>
+                        <h3>{prop.name}</h3>
+                        <p>{prop.description}</p>
+                      </div>
+                      <Button
+                        className="skin-cta"
+                        display="block"
+                        size="small"
+                        color={owned ? 'dark' : 'primary'}
+                        variant={owned ? 'weak' : 'fill'}
+                        disabled={owned}
+                        onClick={() => useProp(prop)}
+                      >
+                        {owned ? '보유 중' : <NyamAmount amount={prop.price} />}
+                      </Button>
+                    </article>
+                  )
+                })}
+              </div>
+            </>
           ) : (
             <>
               <div className="companion-name-edit">
@@ -2737,10 +2938,6 @@ function PocketApp({ userHash }: { userHash: string }) {
               <span><b>문의 또는 의견 보내기</b><small>메일 앱에서 내용을 작성해 보내요.</small></span>
               <strong>메일 열기</strong>
             </button>
-            <div className="support-email">
-              <span>khnam022@naver.com</span>
-              <button type="button" onClick={copySupportEmail}>주소 복사</button>
-            </div>
           </section>
 
           <section className="settings-section backup-section">
@@ -2976,6 +3173,21 @@ function PocketApp({ userHash }: { userHash: string }) {
             </svg>
           </span>
           <span className="tab-label">꾸미기</span>
+        </button>
+        {/* 설정은 방 위가 아니라 메뉴 끝에 두어 방 연출을 가리지 않음 */}
+        <button
+          className={`tab-settings ${activePanel === 'settings' ? 'active' : ''}`}
+          onClick={() => setActivePanel(activePanel === 'settings' ? 'expense' : 'settings')}
+          type="button"
+          aria-label="설정"
+        >
+          <span className="tab-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 7.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="tab-label">설정</span>
         </button>
       </nav>
     </main>

@@ -146,25 +146,6 @@ body.is-expense-sheet-open .app-shell {
   position: relative;
 }
 
-.settings-button {
-  position: absolute;
-  z-index: 18;
-  top: 22px;
-  right: 26px;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, .7);
-  border-radius: 14px;
-  color: #4e5968;
-  background: rgba(255, 255, 255, .86);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .1);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-}
-
 .summary-panel,
 .balance-card,
 .panel-card {
@@ -261,9 +242,6 @@ body.is-expense-sheet-open .app-shell {
 .inline-guide p { display: grid; gap: 3px; margin: 0; }
 .inline-guide b { font-size: 13px; }
 .inline-guide span { color: var(--pm-text-sub); font-size: 12px; line-height: 1.45; }
-.support-email { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--pm-line); }
-.support-email span { color: var(--pm-text-sub); font-size: 12px; }
-.support-email button { padding: 7px 10px; border: 0; border-radius: 9px; color: var(--pm-blue); background: var(--pm-tint); font-size: 12px; font-weight: 700; cursor: pointer; }
 .app-version { margin: 20px 0 4px; color: var(--pm-text-sub); font-size: 11px; text-align: center; }
 
 .panel-body {
@@ -408,6 +386,7 @@ body.is-expense-sheet-open .app-shell {
   background: #f2f4f6;
 }
 .segment.three { grid-template-columns: repeat(3, 1fr); }
+.segment.four { grid-template-columns: repeat(4, 1fr); }
 .segment button {
   border: 0;
   border-radius: 10px;
@@ -779,7 +758,7 @@ body.is-expense-sheet-open .app-shell {
   position: fixed;
   z-index: 40;
   left: 50%;
-  bottom: calc(96px + var(--pm-safe-bottom));
+  bottom: calc(92px + var(--pm-safe-bottom));
   transform: translateX(-50%);
   max-width: min(90vw, 420px);
   margin: 0;
@@ -792,18 +771,18 @@ body.is-expense-sheet-open .app-shell {
   white-space: nowrap;
 }
 
-/* ?�단 ?�로????�� */
+/* 하단 플로팅 탭 — 홈·예산·내역·같이·꾸미기·설정 6칸 한 줄 */
 .floating-tab {
   position: fixed;
   z-index: 30;
   left: 50%;
   bottom: calc(12px + var(--pm-safe-bottom));
   transform: translateX(-50%);
-  width: min(420px, calc(100% - 24px));
+  width: min(440px, calc(100% - 16px));
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
-  padding: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  padding: 6px 4px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid var(--pm-line);
@@ -815,8 +794,9 @@ body.is-expense-sheet-open .app-shell {
   place-items: center;
   gap: 2px;
   border: 0;
-  border-radius: 16px;
-  padding: 8px 4px;
+  border-radius: 14px;
+  padding: 6px 2px;
+  min-width: 0;
   background: transparent;
   color: var(--pm-text-sub);
   font-size: 10px;
@@ -826,29 +806,32 @@ body.is-expense-sheet-open .app-shell {
 .floating-tab .tab-icon {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   line-height: 1;
 }
 .floating-tab .tab-icon svg {
   display: block;
+  width: 18px;
+  height: 18px;
 }
 .floating-tab .tab-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 .floating-tab button.active {
   color: var(--pm-blue);
   background: var(--pm-tint);
 }
 
-/* 기록 추�? FAB */
+/* 기록 추가 FAB — 한 줄 탭바 바로 위, 오른쪽 (메뉴와 겹치지 않게) */
 .fab-add {
   position: fixed;
   z-index: 35;
-  right: max(16px, calc(50% - 240px + 16px));
-  bottom: calc(86px + var(--pm-safe-bottom));
+  right: max(16px, calc(50% - 220px + 12px));
+  bottom: calc(78px + var(--pm-safe-bottom));
   display: grid;
   place-items: center;
   width: 52px;
@@ -1167,6 +1150,10 @@ body.is-expense-sheet-open .app-shell {
 .parcel-prop:nth-last-child(2) { right: 12%; bottom: 0; width: 16%; transform: scale(0.88) rotate(3deg); }
 .parcel-prop:nth-last-child(3) { right: 22%; bottom: 1%; width: 14%; transform: scale(0.76) rotate(-4deg); }
 .parcel-prop:nth-last-child(4) { right: 30%; bottom: -1%; width: 12%; transform: scale(0.68) rotate(5deg); }
+.prop-grid article > img {
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.55);
+}
 @keyframes prop-arrive {
   from { opacity: 0; translate: 0 -12px; }
   to { opacity: 1; translate: 0 0; }
@@ -1230,42 +1217,35 @@ body.is-expense-sheet-open .app-shell {
   pointer-events: none;
   user-select: none;
 }
-/* 강아지 머리 ??말풍????꼬리 ?�린 채팅 버블 */
+/* 말풍선 — 항상 캐릭터 오른쪽 위, 짧은 폭으로 줄바꿈 */
 .speech {
   position: absolute;
   z-index: 7;
-  left: 58%;
-  top: -2%;
-  width: max-content;
-  max-width: min(210px, calc(100vw - 96px));
+  left: 62%;
+  top: -4%;
+  right: auto;
+  width: 9.5em;
+  max-width: min(9.5em, calc(100vw - 120px));
   margin: 0;
-  padding: 11px 14px 12px;
+  padding: 10px 12px;
   border: 1px solid rgba(25, 31, 40, 0.06);
-  border-radius: 18px;
+  border-radius: 16px;
   color: var(--pm-text);
   background: rgba(255, 255, 255, 0.96);
   box-shadow:
     0 2px 4px rgba(25, 31, 40, 0.04),
-    0 12px 28px rgba(25, 31, 40, 0.12);
+    0 10px 22px rgba(25, 31, 40, 0.1);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transform: none;
   cursor: default;
   pointer-events: none;
-  animation: speech-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.speech.opens-right {
-  left: 58%;
-  right: auto;
-}
-.speech.opens-left {
-  right: 58%;
-  left: auto;
+  animation: speech-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .speech::after {
   content: "";
   position: absolute;
-  left: 18px;
+  left: 14px;
   bottom: -6px;
   width: 12px;
   height: 12px;
@@ -1276,19 +1256,15 @@ body.is-expense-sheet-open .app-shell {
   border-radius: 0 0 2px 0;
   box-shadow: 2px 2px 4px rgba(25, 31, 40, 0.04);
 }
-.speech.opens-left::after {
-  right: 18px;
-  left: auto;
-  transform: rotate(45deg);
-}
 .speech-text {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.4;
   letter-spacing: -0.02em;
   word-break: keep-all;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 .speech.is-talk {
   color: #191f28;
@@ -1303,7 +1279,7 @@ body.is-expense-sheet-open .app-shell {
   border-color: rgba(49, 130, 246, 0.18);
   box-shadow:
     0 2px 4px rgba(49, 130, 246, 0.06),
-    0 12px 28px rgba(49, 130, 246, 0.14);
+    0 10px 22px rgba(49, 130, 246, 0.12);
 }
 .speech.is-nudge::after {
   background: #e8f3ff;
@@ -1316,7 +1292,7 @@ body.is-expense-sheet-open .app-shell {
 @keyframes speech-pop {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.94);
+    transform: translateY(6px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -1600,3 +1576,15 @@ body.is-expense-sheet-open .app-shell {
 .party-shopping-prop { right: calc(5% + var(--pile-index) * 4%); bottom: calc(4% + var(--pile-index) * 2%); width: 13%; }
 .theme-camping .party-food-prop { left: calc(4% + var(--pile-index) * 3%); top: auto; bottom: calc(12% + var(--pile-index) * 2%); width: 13%; }
 .theme-camping .party-shopping-prop { right: calc(5% + var(--pile-index) * 4%); bottom: calc(5% + var(--pile-index) * 2%); width: 14%; }
+.mate-level-card { display: grid; gap: 7px; padding: 14px 15px; border: 1px solid var(--pm-tint-line); border-radius: 16px; background: var(--pm-tint); }
+.mate-level-card p { display: flex; justify-content: space-between; margin: 0; font-size: 13px; }
+.mate-level-card p span, .mate-level-card small { color: var(--pm-text-sub); font-size: 11px; }
+.mate-level-card i { display: block; height: 8px; overflow: hidden; border-radius: 99px; background: var(--pm-line); }
+.mate-level-card em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--pm-blue), var(--pm-accent-light)); transition: width .35s ease; }
+.mate-daily-challenge { display: grid; gap: 7px; padding: 15px; border: 1px solid var(--pm-line); border-radius: 17px; background: var(--pm-surface); }
+.mate-daily-challenge p { display: flex; justify-content: space-between; margin: 0; font-size: 12px; }
+.mate-daily-challenge p span, .mate-daily-challenge small { color: var(--pm-text-sub); font-size: 11px; }
+.mate-daily-challenge strong { font-size: 15px; }
+.mate-daily-challenge i { display: block; height: 8px; overflow: hidden; border-radius: 99px; background: var(--pm-line); }
+.mate-daily-challenge em { display: block; height: 100%; border-radius: inherit; background: var(--pm-blue); }
+.mate-daily-challenge.is-over em { background: #f04452; }

@@ -3,6 +3,11 @@ import { ensureAnonymousSession, supabase } from './supabase.ts'
 
 export type SharedReaction = '잘 참는 중' | '눈찌가 보고 있다' | '오늘도 같이 가자'
 export type SharedRoomTheme = 'christmas' | 'camping'
+export type DailyMateMission = {
+  type: 'each_limit' | 'combined_limit' | 'food_limit' | 'shopping_limit'
+  title: string
+  goal: number
+}
 
 const client = () => {
   if (!supabase) throw new Error('Supabase가 연결되지 않았어요.')
@@ -41,12 +46,14 @@ export const loadMateRoom = async () => {
     .eq('room_id', membership.data.room_id)
   if (members.error) throw members.error
   const mate = members.data?.find(member => member.user_id !== userId)
-  const room = await client().from('mate_rooms').select('theme').eq('id', membership.data.room_id).single()
+  const room = await client().from('mate_rooms').select('theme, success_days, room_level').eq('id', membership.data.room_id).single()
   if (room.error) throw room.error
   return {
     roomId: membership.data.room_id as string,
     mateName: mate?.display_name ?? null,
     theme: room.data.theme as SharedRoomTheme,
+    successDays: Number(room.data.success_days ?? 0),
+    roomLevel: Number(room.data.room_level ?? 1),
   }
 }
 
@@ -91,13 +98,13 @@ export const loadMateActivity = async (roomId: string) => {
   const userId = session.user.id
   const today = new Date().toLocaleDateString('en-CA')
   const summaries = await client().from('mate_daily_summaries')
-    .select('user_id, total_spent').eq('room_id', roomId).eq('summary_date', today)
+    .select('user_id, total_spent, category_totals').eq('room_id', roomId).eq('summary_date', today)
   if (summaries.error) throw summaries.error
   const members = await client().from('mate_room_members')
     .select('user_id, display_name').eq('room_id', roomId)
   if (members.error) throw members.error
   const mate = members.data?.find(row => row.user_id !== userId)
-  const room = await client().from('mate_rooms').select('theme').eq('id', roomId).single()
+  const room = await client().from('mate_rooms').select('theme, success_days, room_level').eq('id', roomId).single()
   if (room.error) throw room.error
   const mateSummary = summaries.data?.find(row => row.user_id !== userId)
   const shared = await client().from('mate_shared_expenses')
@@ -107,17 +114,34 @@ export const loadMateActivity = async (roomId: string) => {
   return {
     mateName: mate?.display_name ?? null,
     theme: room.data.theme as SharedRoomTheme,
+    successDays: Number(room.data.success_days ?? 0),
+    roomLevel: Number(room.data.room_level ?? 1),
     mateSpentToday: Number(mateSummary?.total_spent ?? 0),
+    mateCategoryTotals: (mateSummary?.category_totals ?? {}) as Record<string, number>,
     mateRecentExpenses: (shared.data ?? [])
       .filter(row => row.user_id !== userId)
       .map(row => ({ category: row.category, amount: Number(row.amount), memo: row.memo ?? '' })),
   }
 }
 
+export const loadDailyMateMission = async (roomId: string): Promise<DailyMateMission> => {
+  await ensureAnonymousSession()
+  const { data, error } = await client().rpc('get_mate_daily_mission', { p_room_id: roomId })
+  if (error) throw error
+  return data as DailyMateMission
+}
+
 export const updateMateRoomTheme = async (roomId: string, theme: SharedRoomTheme) => {
   await ensureAnonymousSession()
   const { error } = await client().rpc('set_mate_room_theme', { p_room_id: roomId, p_theme: theme })
   if (error) throw error
+}
+
+export const completeMateDailyMission = async (roomId: string) => {
+  await ensureAnonymousSession()
+  const { data, error } = await client().rpc('complete_mate_daily_mission', { p_room_id: roomId })
+  if (error) throw error
+  return data as { completed: boolean; new?: boolean; successDays?: number; roomLevel?: number; reason?: string }
 }
 
 export const sendMateReactionToRoom = async (roomId: string, reaction: SharedReaction) => {

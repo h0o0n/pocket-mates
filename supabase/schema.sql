@@ -397,6 +397,8 @@ create table if not exists public.mate_rooms (
 alter table public.mate_rooms
   add column if not exists theme text not null default 'christmas'
   check (theme in ('christmas', 'camping'));
+alter table public.mate_rooms add column if not exists success_days integer not null default 0 check (success_days >= 0);
+alter table public.mate_rooms add column if not exists room_level smallint not null default 1 check (room_level between 1 and 4);
 
 create table if not exists public.mate_room_members (
   room_id uuid not null references public.mate_rooms (id) on delete cascade,
@@ -452,6 +454,16 @@ create table if not exists public.mate_reactions (
   foreign key (room_id, sender_id) references public.mate_room_members (room_id, user_id) on delete cascade
 );
 
+create table if not exists public.mate_daily_successes (
+  room_id uuid not null references public.mate_rooms (id) on delete cascade,
+  success_date date not null default current_date,
+  combined_spent bigint not null check (combined_spent >= 0),
+  created_at timestamptz not null default now(),
+  primary key (room_id, success_date)
+);
+alter table public.mate_daily_successes add column if not exists mission_type text;
+alter table public.mate_daily_successes add column if not exists goal bigint;
+
 create or replace function private.is_mate_room_member(p_room_id uuid)
 returns boolean language sql stable security definer set search_path = ''
 as $$
@@ -467,6 +479,7 @@ alter table public.mate_invites enable row level security;
 alter table public.mate_daily_summaries enable row level security;
 alter table public.mate_shared_expenses enable row level security;
 alter table public.mate_reactions enable row level security;
+alter table public.mate_daily_successes enable row level security;
 
 revoke all on public.mate_rooms, public.mate_room_members, public.mate_invites from anon, authenticated;
 grant select on public.mate_rooms to authenticated;
@@ -474,6 +487,7 @@ grant select on public.mate_room_members to authenticated;
 grant select, insert, update, delete on public.mate_daily_summaries to authenticated;
 grant select, insert, update, delete on public.mate_shared_expenses to authenticated;
 grant select, insert, delete on public.mate_reactions to authenticated;
+grant select on public.mate_daily_successes to authenticated;
 
 drop policy if exists "mate_rooms_members_only" on public.mate_rooms;
 drop policy if exists "mate_rooms_create_own" on public.mate_rooms;
@@ -487,6 +501,7 @@ drop policy if exists "mate_expenses_members_read" on public.mate_shared_expense
 drop policy if exists "mate_expenses_write_own" on public.mate_shared_expenses;
 drop policy if exists "mate_reactions_members_read" on public.mate_reactions;
 drop policy if exists "mate_reactions_send_own" on public.mate_reactions;
+drop policy if exists "mate_successes_members_read" on public.mate_daily_successes;
 
 create policy "mate_rooms_members_only" on public.mate_rooms for select to authenticated
   using (private.is_mate_room_member(id));
@@ -512,6 +527,8 @@ create policy "mate_reactions_members_read" on public.mate_reactions for select 
   using (private.is_mate_room_member(room_id));
 create policy "mate_reactions_send_own" on public.mate_reactions for insert to authenticated
   with check (sender_id = (select auth.uid()) and private.is_mate_room_member(room_id));
+create policy "mate_successes_members_read" on public.mate_daily_successes for select to authenticated
+  using (private.is_mate_room_member(room_id));
 
 revoke all on function private.is_mate_room_member(uuid) from public, anon;
 grant execute on function private.is_mate_room_member(uuid) to authenticated;
@@ -584,6 +601,90 @@ $$;
 
 revoke all on function public.set_mate_room_theme(uuid, text) from public, anon;
 grant execute on function public.set_mate_room_theme(uuid, text) to authenticated;
+
+create or replace function public.get_mate_daily_mission(p_room_id uuid, p_date date default current_date)
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_pick integer;
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 확인할 수 있습니다.'; end if;
+  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || p_date::text, 0) % 4);
+  return case v_pick
+    when 0 then jsonb_build_object('type','each_limit','title','둘 다 15,000원 이하로 쓰기','goal',15000)
+    when 1 then jsonb_build_object('type','combined_limit','title','둘이 합쳐 25,000원 이하로 쓰기','goal',25000)
+    when 2 then jsonb_build_object('type','food_limit','title','둘의 식비 합계 16,000원 이하로 쓰기','goal',16000)
+    else jsonb_build_object('type','shopping_limit','title','둘의 쇼핑 합계 20,000원 이하로 쓰기','goal',20000)
+  end;
+end;
+$$;
+
+create or replace function public.complete_mate_daily_mission(p_room_id uuid, p_date date default (current_date - 1))
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_limit bigint;
+  v_member_count integer;
+  v_summary_count integer;
+  v_combined bigint;
+  v_category_spent bigint;
+  v_pick integer;
+  v_mission_type text;
+  v_goal bigint;
+  v_success boolean := false;
+  v_success_days integer;
+  v_level smallint;
+  v_inserted integer;
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '공동룸 구성원만 완료할 수 있습니다.'; end if;
+  select daily_limit into v_limit from public.mate_rooms where id = p_room_id for update;
+  select count(*) into v_member_count from public.mate_room_members where room_id = p_room_id;
+  if v_member_count <> 2 then
+    return jsonb_build_object('completed', false, 'reason', '친구가 참여하면 시작돼요.');
+  end if;
+  select count(*), coalesce(sum(total_spent), 0)
+  into v_summary_count, v_combined
+  from public.mate_daily_summaries
+  where room_id = p_room_id and summary_date = p_date;
+  if v_summary_count <> 2 then return jsonb_build_object('completed', false, 'reason', '두 사람의 기록이 모두 필요해요.'); end if;
+  v_pick := abs(pg_catalog.hashtextextended(p_room_id::text || p_date::text, 0) % 4);
+  if v_pick = 0 then
+    v_mission_type := 'each_limit'; v_goal := 15000;
+    select bool_and(total_spent <= v_goal) into v_success from public.mate_daily_summaries where room_id = p_room_id and summary_date = p_date;
+  elsif v_pick = 1 then
+    v_mission_type := 'combined_limit'; v_goal := 25000; v_success := v_combined <= v_goal;
+  elsif v_pick = 2 then
+    v_mission_type := 'food_limit'; v_goal := 16000;
+    select coalesce(sum(coalesce((category_totals->>'coffee')::bigint,0) + coalesce((category_totals->>'delivery')::bigint,0) + coalesce((category_totals->>'dining')::bigint,0)),0)
+    into v_category_spent from public.mate_daily_summaries where room_id = p_room_id and summary_date = p_date;
+    v_success := v_category_spent <= v_goal;
+  else
+    v_mission_type := 'shopping_limit'; v_goal := 20000;
+    select coalesce(sum(coalesce((category_totals->>'shopping')::bigint,0)),0)
+    into v_category_spent from public.mate_daily_summaries where room_id = p_room_id and summary_date = p_date;
+    v_success := v_category_spent <= v_goal;
+  end if;
+  if not v_success then return jsonb_build_object('completed', false, 'reason', '어제 공동 미션 한도를 넘었어요.'); end if;
+  insert into public.mate_daily_successes (room_id, success_date, combined_spent, mission_type, goal)
+  values (p_room_id, p_date, v_combined, v_mission_type, v_goal)
+  on conflict (room_id, success_date) do nothing;
+  get diagnostics v_inserted = row_count;
+  if v_inserted > 0 then
+    update public.mate_rooms set success_days = success_days + 1 where id = p_room_id;
+  end if;
+  select success_days into v_success_days from public.mate_rooms where id = p_room_id;
+  v_level := case when v_success_days >= 14 then 4 when v_success_days >= 7 then 3 when v_success_days >= 3 then 2 else 1 end;
+  update public.mate_rooms set room_level = v_level where id = p_room_id;
+  return jsonb_build_object('completed', true, 'new', v_inserted > 0, 'successDays', v_success_days, 'roomLevel', v_level);
+end;
+$$;
+
+revoke all on function public.get_mate_daily_mission(uuid, date) from public, anon;
+grant execute on function public.get_mate_daily_mission(uuid, date) to authenticated;
+revoke all on function public.complete_mate_daily_mission(uuid, date) from public, anon;
+grant execute on function public.complete_mate_daily_mission(uuid, date) to authenticated;
 
 insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement, slot)
 values
