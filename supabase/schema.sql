@@ -686,6 +686,21 @@ grant execute on function public.get_mate_daily_mission(uuid, date) to authentic
 revoke all on function public.complete_mate_daily_mission(uuid, date) from public, anon;
 grant execute on function public.complete_mate_daily_mission(uuid, date) to authenticated;
 
+create or replace function public.leave_mate_room(p_room_id uuid)
+returns boolean language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is null then raise exception '인증이 필요합니다.'; end if;
+  if not private.is_mate_room_member(p_room_id) then raise exception '참여 중인 공동룸이 아닙니다.'; end if;
+  -- 2인 전용 팀룸이므로 한 명이 나가면 방과 공유 데이터 전체를 종료합니다.
+  delete from public.mate_rooms where id = p_room_id;
+  return true;
+end;
+$$;
+
+revoke all on function public.leave_mate_room(uuid) from public, anon;
+grant execute on function public.leave_mate_room(uuid) to authenticated;
+
 insert into public.shop_items (id, item_type, category, name, description, price, asset_path, sprite_column, sprite_row, placement, slot)
 values
   ('furniture-bed', 'decoration', 'retro', '포근한 침대', '방의 절반을 차지하는 행복', 0, '/assets/flat/items/furniture-bed.svg', 0, 0, '{}', 'seating'),

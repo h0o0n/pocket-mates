@@ -144,6 +144,12 @@ export const completeMateDailyMission = async (roomId: string) => {
   return data as { completed: boolean; new?: boolean; successDays?: number; roomLevel?: number; reason?: string }
 }
 
+export const leaveMateRoom = async (roomId: string) => {
+  await ensureAnonymousSession()
+  const { error } = await client().rpc('leave_mate_room', { p_room_id: roomId })
+  if (error) throw error
+}
+
 export const sendMateReactionToRoom = async (roomId: string, reaction: SharedReaction) => {
   const session = await ensureAnonymousSession()
   const { error } = await client().from('mate_reactions').insert({

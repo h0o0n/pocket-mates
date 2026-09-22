@@ -145,6 +145,31 @@ body.is-expense-sheet-open .app-shell {
   padding: 12px 16px 0;
   position: relative;
 }
+.room-view-switch {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(184px, 52%);
+  margin: 0 auto 9px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pm-line);
+}
+.room-view-switch button {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pm-text-sub);
+  font-size: 12px;
+  font-weight: 800;
+}
+.room-view-switch button.active {
+  background: var(--pm-surface);
+  color: var(--pm-text);
+  box-shadow: 0 2px 8px rgba(25, 31, 40, .08);
+}
 
 .summary-panel,
 .balance-card,
@@ -1545,6 +1570,29 @@ body.is-expense-sheet-open .app-shell {
 .mate-feed strong { font-size: 13px; }
 .mate-reactions > div { display: flex; flex-wrap: wrap; gap: 7px; }
 .mate-reactions button { padding: 9px 11px; border: 1px solid var(--pm-tint-line); border-radius: 999px; background: var(--pm-tint); color: var(--pm-text); font-size: 12px; font-weight: 700; }
+.main-team-room { border-radius: 20px; box-shadow: 0 8px 24px rgba(25,31,40,.08); }
+.main-team-status { position: absolute; z-index: 6; right: 10px; bottom: 10px; left: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 11px; border-radius: 13px; background: rgba(255,255,255,.9); color: #191f28; backdrop-filter: blur(8px); }
+.main-team-status b { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.main-team-status span { flex: none; color: #6b7684; font-size: 10px; font-weight: 700; }
+.main-team-room .party-mates { bottom: 16%; }
+.team-room-empty { display: grid; aspect-ratio: 16/10; place-content: center; justify-items: center; gap: 10px; border: 1px dashed var(--pm-tint-line); border-radius: 20px; background: var(--pm-tint); color: var(--pm-text); }
+.team-room-empty > span { font-size: 34px; }
+.team-room-empty > b { font-size: 15px; }
+.team-room-empty button { padding: 9px 14px; border: 0; border-radius: 999px; background: var(--pm-blue); color: #fff; font-size: 12px; font-weight: 800; }
+.open-main-team-room { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px 15px; border: 1px solid var(--pm-tint-line); border-radius: 16px; background: var(--pm-tint); color: var(--pm-text); text-align: left; }
+.open-main-team-room span { display: grid; gap: 3px; min-width: 0; }
+.open-main-team-room b { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.open-main-team-room small { color: var(--pm-text-sub); font-size: 11px; }
+.open-main-team-room > strong { flex: none; color: var(--pm-blue); font-size: 12px; }
+.mate-danger-zone { padding-top: 5px; border-top: 1px solid var(--pm-line); }
+.mate-leave-button { width: 100%; padding: 12px; border: 0; background: transparent; color: #e34d59; font-size: 13px; font-weight: 700; }
+.mate-leave-confirm { display: grid; gap: 12px; padding: 14px; border-radius: 16px; background: color-mix(in srgb, #f04452 8%, var(--pm-surface)); }
+.mate-leave-confirm p { display: grid; gap: 3px; margin: 0; }
+.mate-leave-confirm p b { color: #e34d59; font-size: 13px; }
+.mate-leave-confirm p span { color: var(--pm-text-sub); font-size: 11px; line-height: 1.45; }
+.mate-leave-confirm > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mate-leave-confirm button { padding: 10px; border: 1px solid var(--pm-line); border-radius: 12px; background: var(--pm-surface); color: var(--pm-text); font-weight: 800; }
+.mate-leave-confirm button.danger { border-color: #f04452; background: #f04452; color: #fff; }
 
 .backup-section > h3 { margin: 0 0 4px; }
 .backup-section > p { margin: 0 0 12px; color: var(--pm-text-sub); font-size: 12px; line-height: 1.5; }
