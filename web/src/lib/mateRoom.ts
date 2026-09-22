@@ -7,6 +7,8 @@ export type SharedMateAvatar = {
   companionId: 'nunchi' | 'foodie' | 'shopper' | 'subscriber'
   outfitId: string
   visualState: 'neutral' | 'chubby' | 'very-chubby' | 'receipt' | 'eating'
+  foodPileCount: number
+  parcelPileCount: number
 }
 export type DailyMateMission = {
   type: 'each_limit' | 'combined_limit' | 'food_limit' | 'shopping_limit'
@@ -47,7 +49,7 @@ export const loadMateRoom = async () => {
   if (!membership.data) return null
 
   const members = await client().from('mate_room_members')
-    .select('user_id, display_name, companion_id, outfit_id, visual_state')
+    .select('user_id, display_name, companion_id, outfit_id, visual_state, food_pile_count, parcel_pile_count')
     .eq('room_id', membership.data.room_id)
   if (members.error) throw members.error
   const mate = members.data?.find(member => member.user_id !== userId)
@@ -60,6 +62,8 @@ export const loadMateRoom = async () => {
       companionId: mate.companion_id,
       outfitId: mate.outfit_id,
       visualState: mate.visual_state,
+      foodPileCount: Number(mate.food_pile_count ?? 0),
+      parcelPileCount: Number(mate.parcel_pile_count ?? 0),
     } as SharedMateAvatar : null,
     theme: room.data.theme as SharedRoomTheme,
     successDays: Number(room.data.success_days ?? 0),
@@ -111,7 +115,7 @@ export const loadMateActivity = async (roomId: string) => {
     .select('user_id, total_spent, category_totals').eq('room_id', roomId).eq('summary_date', today)
   if (summaries.error) throw summaries.error
   const members = await client().from('mate_room_members')
-    .select('user_id, display_name, companion_id, outfit_id, visual_state').eq('room_id', roomId)
+    .select('user_id, display_name, companion_id, outfit_id, visual_state, food_pile_count, parcel_pile_count').eq('room_id', roomId)
   if (members.error) throw members.error
   const mate = members.data?.find(row => row.user_id !== userId)
   const room = await client().from('mate_rooms').select('theme, success_days, room_level').eq('id', roomId).single()
@@ -127,6 +131,8 @@ export const loadMateActivity = async (roomId: string) => {
       companionId: mate.companion_id,
       outfitId: mate.outfit_id,
       visualState: mate.visual_state,
+      foodPileCount: Number(mate.food_pile_count ?? 0),
+      parcelPileCount: Number(mate.parcel_pile_count ?? 0),
     } as SharedMateAvatar : null,
     theme: room.data.theme as SharedRoomTheme,
     successDays: Number(room.data.success_days ?? 0),
@@ -147,6 +153,8 @@ export const syncMateAvatar = async (roomId: string, displayName: string, avatar
     p_companion_id: avatar.companionId,
     p_outfit_id: avatar.outfitId,
     p_visual_state: avatar.visualState,
+    p_food_pile_count: avatar.foodPileCount,
+    p_parcel_pile_count: avatar.parcelPileCount,
   })
   if (error) throw error
 }

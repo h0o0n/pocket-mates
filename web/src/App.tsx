@@ -1103,16 +1103,10 @@ function PocketApp({ userHash }: { userHash: string }) {
   const myMateProgress = Math.min(100, (todaySpent / DAILY_MATE_LIMIT) * 100)
   const friendMateProgress = Math.min(100, (mateRoom.mateSpentToday / DAILY_MATE_LIMIT) * 100)
   const myTodayExpenses = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
-  const mateFoodCount = [
-    ...myTodayExpenses,
-    ...mateRoom.mateRecentExpenses,
-  ].filter(expense => ['coffee', 'delivery', 'dining'].includes(expense.category)).length
-  const mateShoppingCount = [
-    ...myTodayExpenses,
-    ...mateRoom.mateRecentExpenses,
-  ].filter(expense => expense.category === 'shopping').length
-  const mateFoodProps = Math.min(3, mateFoodCount)
-  const mateShoppingProps = Math.min(3, mateShoppingCount)
+  // 팀룸도 개인룸과 똑같이 월간 기록 3건당 소품 1개가 생깁니다.
+  // 내 누적 단계와 상대가 동기화한 누적 단계를 합쳐 공동룸에 보여줍니다.
+  const mateFoodProps = Math.min(8, deliveryPileCount + (mateRoom.mateAvatar?.foodPileCount ?? 0))
+  const mateShoppingProps = Math.min(8, parcelPileCount + (mateRoom.mateAvatar?.parcelPileCount ?? 0))
   const myCategoryTotal = (names: ExpenseCategory[]) => myTodayExpenses.filter(item => names.includes(item.category)).reduce((sum, item) => sum + item.amount, 0)
   const missionCurrent = dailyMateMission.type === 'each_limit'
     ? Math.max(todaySpent, mateRoom.mateSpentToday)
@@ -1184,10 +1178,12 @@ function PocketApp({ userHash }: { userHash: string }) {
         companionId,
         outfitId: equippedClothes.id,
         visualState: dogVisualState,
+        foodPileCount: deliveryPileCount,
+        parcelPileCount,
       }).catch(() => {})
     }, 350)
     return () => window.clearTimeout(timer)
-  }, [mateRoom.roomId, companionName, companionId, equippedClothes.id, dogVisualState])
+  }, [mateRoom.roomId, companionName, companionId, equippedClothes.id, dogVisualState, deliveryPileCount, parcelPileCount])
   useEffect(() => {
     if (!mateRoom.roomId || !isSupabaseConfigured) return
     let alive = true

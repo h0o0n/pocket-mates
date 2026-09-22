@@ -418,6 +418,12 @@ alter table public.mate_room_members
 alter table public.mate_room_members
   add column if not exists visual_state text not null default 'neutral'
   check (visual_state in ('neutral', 'chubby', 'very-chubby', 'receipt', 'eating'));
+alter table public.mate_room_members
+  add column if not exists food_pile_count smallint not null default 0
+  check (food_pile_count between 0 and 4);
+alter table public.mate_room_members
+  add column if not exists parcel_pile_count smallint not null default 0
+  check (parcel_pile_count between 0 and 4);
 
 create table if not exists public.mate_invites (
   id uuid primary key default gen_random_uuid(),
@@ -610,12 +616,15 @@ $$;
 revoke all on function public.set_mate_room_theme(uuid, text) from public, anon;
 grant execute on function public.set_mate_room_theme(uuid, text) to authenticated;
 
+drop function if exists public.sync_mate_avatar(uuid, text, text, text, text);
 create or replace function public.sync_mate_avatar(
   p_room_id uuid,
   p_display_name text,
   p_companion_id text,
   p_outfit_id text,
-  p_visual_state text
+  p_visual_state text,
+  p_food_pile_count integer,
+  p_parcel_pile_count integer
 )
 returns boolean language plpgsql security definer set search_path = ''
 as $$
@@ -628,14 +637,16 @@ begin
   set display_name = left(coalesce(nullif(trim(p_display_name), ''), '눈찌'), 20),
       companion_id = p_companion_id,
       outfit_id = left(coalesce(nullif(trim(p_outfit_id), ''), 'none'), 60),
-      visual_state = p_visual_state
+      visual_state = p_visual_state,
+      food_pile_count = least(4, greatest(0, p_food_pile_count)),
+      parcel_pile_count = least(4, greatest(0, p_parcel_pile_count))
   where room_id = p_room_id and user_id = auth.uid();
   return found;
 end;
 $$;
 
-revoke all on function public.sync_mate_avatar(uuid, text, text, text, text) from public, anon;
-grant execute on function public.sync_mate_avatar(uuid, text, text, text, text) to authenticated;
+revoke all on function public.sync_mate_avatar(uuid, text, text, text, text, integer, integer) from public, anon;
+grant execute on function public.sync_mate_avatar(uuid, text, text, text, text, integer, integer) to authenticated;
 
 create or replace function public.get_mate_daily_mission(p_room_id uuid, p_date date default current_date)
 returns jsonb language plpgsql stable security definer set search_path = ''
