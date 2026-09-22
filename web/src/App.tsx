@@ -916,6 +916,10 @@ function PocketApp({ userHash }: { userHash: string }) {
   }))
   const [mateCodeInput, setMateCodeInput] = useState('')
   const [dailyMateMission, setDailyMateMission] = useState<DailyMateMission>({ type: 'each_limit', title: '둘 다 15,000원 이하로 쓰기', goal: 15_000 })
+  /** 같이 방 미션 칩 — 오늘 하루 숨김 가능 */
+  const [teamMissionHidden, setTeamMissionHidden] = useState(() =>
+    loadJson(k(`mate-mission-hidden-${period.todayKey}`), false),
+  )
   const [backupCode, setBackupCode] = useState('')
   const [backupCodeInput, setBackupCodeInput] = useState('')
   const [backupBusy, setBackupBusy] = useState(false)
@@ -936,6 +940,8 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [activeSnack, setActiveSnack] = useState<(typeof snackBites)[number] | null>(null)
   // 방 안 랜덤 배회로: 목표 좌표를 골라 천천히 이동합니다.
   const [wander, setWander] = useState({ left: 50, bottom: -2, facing: 1 as 1 | -1, moving: false, duration: 3.2 })
+  // 같이방 상대 눈찌도 동일한 배회 모션을 씁니다.
+  const [mateWander, setMateWander] = useState({ left: 68, bottom: -2, facing: -1 as 1 | -1, moving: false, duration: 3.4 })
   const motionTimer = useRef(0)
   const snackTimer = useRef(0)
   const nudgeTimer = useRef(0)
@@ -972,6 +978,7 @@ function PocketApp({ userHash }: { userHash: string }) {
           ),
         )
         setRewardAdsToday(loadJson(k(`reward-ads-${next.todayKey}`), 0))
+        setTeamMissionHidden(loadJson(k(`mate-mission-hidden-${next.todayKey}`), false))
         setSelectedDate(current => (current === previous.todayKey ? next.todayKey : current))
         setExpenseDate(current => (current === previous.todayKey ? next.todayKey : current))
       }
@@ -1034,8 +1041,9 @@ function PocketApp({ userHash }: { userHash: string }) {
       .filter(prop => prop.kind === 'parcel' && propInventory.includes(prop.id))
       .map(prop => prop.image),
   ]
-  const deliveryPileCount = Math.min(4, Math.floor(foodExpenseCount / 3))
-  const parcelPileCount = Math.min(4, Math.floor(shoppingCount / 3))
+  // 식비·쇼핑 3건당 소품 1개 — 개수 상한 없이 누적
+  const deliveryPileCount = Math.floor(foodExpenseCount / 3)
+  const parcelPileCount = Math.floor(shoppingCount / 3)
   const deliveryPiles = Array.from({ length: deliveryPileCount }, (_, index) => {
     const seedExpense = foodExpenses[index * 3 + 2] ?? foodExpenses[index * 3]
     return foodPropPool[stableIndex(seedExpense?.id ?? String(index), foodPropPool.length)]
@@ -1108,10 +1116,9 @@ function PocketApp({ userHash }: { userHash: string }) {
   const myMateProgress = Math.min(100, (todaySpent / DAILY_MATE_LIMIT) * 100)
   const friendMateProgress = Math.min(100, (mateRoom.mateSpentToday / DAILY_MATE_LIMIT) * 100)
   const myTodayExpenses = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
-  // 팀룸도 개인룸과 똑같이 월간 기록 3건당 소품 1개가 생깁니다.
-  // 내 누적 단계와 상대가 동기화한 누적 단계를 합쳐 공동룸에 보여줍니다.
-  const mateFoodProps = Math.min(8, deliveryPileCount + (mateRoom.mateAvatar?.foodPileCount ?? 0))
-  const mateShoppingProps = Math.min(8, parcelPileCount + (mateRoom.mateAvatar?.parcelPileCount ?? 0))
+  // 팀룸도 개인룸과 똑같이 월간 기록 3건당 소품 1개 — 내·상대 누적을 합쳐 표시 (상한 없음)
+  const mateFoodProps = deliveryPileCount + (mateRoom.mateAvatar?.foodPileCount ?? 0)
+  const mateShoppingProps = parcelPileCount + (mateRoom.mateAvatar?.parcelPileCount ?? 0)
   const myCategoryTotal = (names: ExpenseCategory[]) => myTodayExpenses.filter(item => names.includes(item.category)).reduce((sum, item) => sum + item.amount, 0)
   const missionCurrent = dailyMateMission.type === 'each_limit'
     ? Math.max(todaySpent, mateRoom.mateSpentToday)
@@ -1147,6 +1154,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('owned-companions'), ownedCompanions), [ownedCompanions, userHash])
   useEffect(() => saveJson(k('ui-theme'), themeId), [themeId, userHash])
   useEffect(() => saveJson(k('mate-room'), mateRoom), [mateRoom, userHash])
+  useEffect(() => saveJson(k(`mate-mission-hidden-${todayKey}`), teamMissionHidden), [teamMissionHidden, userHash, todayKey])
   useEffect(() => {
     if (!isSupabaseConfigured) return
     void loadMateRoom().then(room => {
@@ -1476,6 +1484,44 @@ function PocketApp({ userHash }: { userHash: string }) {
       window.clearTimeout(timer)
     }
   }, [dogMotion])
+
+  // 같이방 상대 눈찌도 혼자 모드와 같은 방식으로 배회합니다.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let cancelled = false
+    let timer = 0
+
+    const schedule = (delayMs: number, action: () => void) => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        if (!cancelled) action()
+      }, delayMs)
+    }
+
+    const roam = () => {
+      let travelMs = 3200
+      setMateWander(current => {
+        let left = 24 + Math.random() * 52
+        let bottom = -5 + Math.random() * 10
+        if (Math.abs(left - current.left) < 10) left = left > 50 ? left - 18 : left + 18
+        const duration = 2.6 + Math.random() * 2.4
+        travelMs = Math.round(duration * 1000)
+        const facing = (left >= current.left ? 1 : -1) as 1 | -1
+        return { left, bottom, facing, moving: true, duration }
+      })
+      schedule(travelMs, () => {
+        setMateWander(current => ({ ...current, moving: false }))
+        schedule(800 + Math.random() * 2800, roam)
+      })
+    }
+
+    schedule(900 + Math.random() * 1200, roam)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [])
 
   /** PNG 캐릭터에 CSS 클래스만 잠깐 붙여 모션을 재생합니다. */
   const playDogMotion = (motion: DogMotion, durationMs = 1400) => {
@@ -2078,10 +2124,22 @@ function PocketApp({ userHash }: { userHash: string }) {
           {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
           <div className="prop-layer" aria-hidden="true">
             {deliveryPiles.map((source, index) => (
-              <img className="room-prop delivery-prop" src={source} alt="" key={`food-${index}-${source}`} />
+              <img
+                className="room-prop delivery-prop"
+                style={{ '--pile-index': index } as CSSProperties}
+                src={source}
+                alt=""
+                key={`food-${index}-${source}`}
+              />
             ))}
             {parcelPiles.map((source, index) => (
-              <img className="room-prop parcel-prop" src={source} alt="" key={`shopping-${index}-${source}`} />
+              <img
+                className="room-prop parcel-prop"
+                style={{ '--pile-index': index } as CSSProperties}
+                src={source}
+                alt=""
+                key={`shopping-${index}-${source}`}
+              />
             ))}
           </div>
           <div
@@ -2129,17 +2187,101 @@ function PocketApp({ userHash }: { userHash: string }) {
           <section className={`main-team-room party-room theme-${mateRoom.theme} ${mateMissionComplete ? 'is-calm' : 'is-alert'}`} aria-label={`${companionName}와 ${mateRoom.mateName} 함께 보기`}>
             <img className="party-room-art" src={`/assets/rooms/shared/${mateRoom.theme}/room-level-${mateRoom.roomLevel}.png`} alt={`${mateRoom.theme === 'christmas' ? '크리스마스' : '캠핑'} 함께 꾸미기 ${mateRoom.roomLevel}단계`} />
             <div className="party-consumption-props" aria-hidden="true">
-              {Array.from({ length: mateFoodProps }, (_, index) => <img className="party-food-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/food.png`} alt="" key={`main-team-food-${index}`} />)}
-              {Array.from({ length: mateShoppingProps }, (_, index) => <img className="party-shopping-prop" style={{ '--pile-index': index } as CSSProperties} src={`/assets/rooms/shared/${mateRoom.theme}/shopping.png`} alt="" key={`main-team-shopping-${index}`} />)}
+              {Array.from({ length: mateFoodProps }, (_, index) => (
+                <img
+                  className="party-food-prop"
+                  style={{ '--pile-index': index } as CSSProperties}
+                  src={`/assets/rooms/shared/${mateRoom.theme}/food.png`}
+                  alt=""
+                  key={`main-team-food-${index}`}
+                />
+              ))}
+              {Array.from({ length: mateShoppingProps }, (_, index) => (
+                <img
+                  className="party-shopping-prop"
+                  style={{ '--pile-index': index } as CSSProperties}
+                  src={`/assets/rooms/shared/${mateRoom.theme}/shopping.png`}
+                  alt=""
+                  key={`main-team-shopping-${index}`}
+                />
+              ))}
             </div>
-            <div className="party-mates">
-              <div><img src={displayDogImage} alt={companionName} /><span>{companionName}</span></div>
-              <div><img src={mateDisplayImage} alt={`현재 ${mateRoom.mateName} 상태`} /><span>{mateRoom.mateName}</span></div>
+            <div
+              ref={dogAreaRef}
+              className={`dog-wrap party-mate-dog ${dogMotion ? `is-busy motion-${dogMotion}` : `is-wandering ${wander.moving ? 'is-moving' : 'is-idle'}`}`}
+              style={{
+                left: `${wander.left}%`,
+                bottom: `${wander.bottom}%`,
+                transitionDuration: dogMotion ? '0.35s' : `${wander.duration}s`,
+              }}
+            >
+              {bubbleVisible && (
+                <div
+                  className={`speech ${bubbleKind === 'nudge' ? 'is-nudge' : 'is-talk'}`}
+                  aria-live="polite"
+                >
+                  <p className="speech-text">{dogLine || line}</p>
+                </div>
+              )}
+              <div className="dog-facing" style={{ transform: `scaleX(${wander.facing})` }}>
+                <div
+                  className="dog-button"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${companionName}와 대화하기`}
+                  onClick={event => talkToDog(event)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      talkToDog(event)
+                    }
+                  }}
+                >
+                  <img
+                    className="dog-art"
+                    src={displayDogImage}
+                    alt={`현재 ${companionName} 상태: ${status}${dogMotion === 'eat' && activeSnack ? `, ${activeSnack.label} 먹는 중` : ''}`}
+                    draggable={false}
+                  />
+                </div>
+              </div>
+              <span className="party-mate-label">{companionName}</span>
             </div>
-            <div className="main-team-status">
-              <b>{dailyMateMission.title}</b>
-              <span>{won(missionCurrent)}원 / {won(dailyMateMission.goal)}원</span>
+            <div
+              className={`dog-wrap party-mate-dog is-wandering ${mateWander.moving ? 'is-moving' : 'is-idle'}`}
+              style={{
+                left: `${mateWander.left}%`,
+                bottom: `${mateWander.bottom}%`,
+                transitionDuration: `${mateWander.duration}s`,
+              }}
+              aria-label={`${mateRoom.mateName} 눈찌`}
+            >
+              <div className="dog-facing" style={{ transform: `scaleX(${mateWander.facing})` }}>
+                <img
+                  className="dog-art"
+                  src={mateDisplayImage}
+                  alt={`현재 ${mateRoom.mateName} 상태`}
+                  draggable={false}
+                />
+              </div>
+              <span className="party-mate-label">{mateRoom.mateName}</span>
             </div>
+            {!teamMissionHidden && (
+              <div className="main-team-status">
+                <div className="main-team-status-copy">
+                  <b>{dailyMateMission.title}</b>
+                  <span>{won(missionCurrent)} / {won(dailyMateMission.goal)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="main-team-status-close"
+                  aria-label="미션 안내 숨기기"
+                  onClick={() => setTeamMissionHidden(true)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
           </section>
         ) : (
           <section className="team-room-empty">
