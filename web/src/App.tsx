@@ -2051,8 +2051,19 @@ function PocketApp({ userHash }: { userHash: string }) {
 
   return (
     <TDSMobileAITProvider brandPrimaryColor={themePrimary}>
-    <main className="app-shell">
+    <main className={`app-shell ${activePanel === 'settings' ? 'settings-page-open' : ''}`}>
       <div className="hero-room">
+        <button
+          className={`hero-settings-button ${activePanel === 'settings' ? 'active' : ''}`}
+          onClick={() => setActivePanel(activePanel === 'settings' ? 'expense' : 'settings')}
+          type="button"
+          aria-label={activePanel === 'settings' ? '설정 닫기' : '설정 열기'}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+        </button>
         <div className="room-view-switch" role="tablist" aria-label="방 전환">
           <button type="button" role="tab" aria-selected={roomView === 'personal'} className={roomView === 'personal' ? 'active' : ''} onClick={() => setRoomView('personal')}>혼자</button>
           <button type="button" role="tab" aria-selected={roomView === 'team'} className={roomView === 'team' ? 'active' : ''} onClick={openTeamRoom}>같이</button>
@@ -3013,10 +3024,11 @@ function PocketApp({ userHash }: { userHash: string }) {
 
       {activePanel === 'settings' && (
         <section className="panel-card settings-panel">
-          <ListHeader
-            title={<ListHeader.TitleParagraph>설정</ListHeader.TitleParagraph>}
-            right={<ListHeader.RightText>눈찌주는 가계부</ListHeader.RightText>}
-          />
+          <header className="settings-page-header">
+            <button type="button" onClick={() => setActivePanel('expense')} aria-label="설정 닫고 돌아가기">‹</button>
+            <h2>설정</h2>
+            <span>눈찌주는 가계부</span>
+          </header>
 
           <section className="settings-section">
             <h3>화면 테마</h3>
@@ -3293,21 +3305,6 @@ function PocketApp({ userHash }: { userHash: string }) {
             </svg>
           </span>
           <span className="tab-label">꾸미기</span>
-        </button>
-        {/* 설정은 방 위가 아니라 메뉴 끝에 두어 방 연출을 가리지 않음 */}
-        <button
-          className={`tab-settings ${activePanel === 'settings' ? 'active' : ''}`}
-          onClick={() => setActivePanel(activePanel === 'settings' ? 'expense' : 'settings')}
-          type="button"
-          aria-label="설정"
-        >
-          <span className="tab-icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 7.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="tab-label">설정</span>
         </button>
       </nav>
     </main>
