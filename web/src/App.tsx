@@ -79,7 +79,7 @@ const roomImages = {
   speechless: '/assets/rooms/budget-states/attic-broke.png',
 } as const
 
-type SkinId = 'attic' | 'cafe' | 'beach'
+type SkinId = 'attic' | 'cafe' | 'beach' | 'nunchi-room' | 'foodie-room' | 'shopper-room' | 'subscriber-room'
 type OutfitId =
   | 'none' | 'scarf' | 'sweater' | 'raincoat'
   | 'bear-gingham-bib' | 'bear-honey-cape' | 'bear-cook-apron'
@@ -362,11 +362,24 @@ const companionOutfitStates = (
   eating: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-eating.png`,
 })
 
-const roomSkins: Array<{ id: SkinId; name: string; description: string; price: number; image: string }> = [
-  { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png' },
-  { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png' },
-  { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png' },
+type RoomSkin = { id: SkinId; name: string; description: string; price: number; image: string; companionId: CompanionId | null }
+
+const roomSkins: RoomSkin[] = [
+  { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png', companionId: null },
+  { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png', companionId: null },
+  { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png', companionId: null },
+  { id: 'nunchi-room', name: '눈찌 다락', description: '영수증을 조용히 세기 좋은 눈찌의 작은 다락', price: 0, image: '/assets/rooms/companions/nunchi-attic.png', companionId: 'nunchi' },
+  { id: 'foodie-room', name: '곰찌 부엌', description: '간식 냄새가 잔액보다 먼저 퍼지는 아늑한 부엌', price: 0, image: '/assets/rooms/companions/foodie-kitchen.png', companionId: 'foodie' },
+  { id: 'shopper-room', name: '너굴 작업실', description: '택배를 뜯고 상자를 정리하는 척하기 좋은 방', price: 0, image: '/assets/rooms/companions/shopper-studio.png', companionId: 'shopper' },
+  { id: 'subscriber-room', name: '물개 라운지', description: '구독 해지는 잊고 콘텐츠는 보기 좋은 바닷빛 방', price: 0, image: '/assets/rooms/companions/subscriber-lounge.png', companionId: 'subscriber' },
 ]
+
+const COMPANION_ROOM: Record<CompanionId, SkinId> = {
+  nunchi: 'nunchi-room',
+  foodie: 'foodie-room',
+  shopper: 'shopper-room',
+  subscriber: 'subscriber-room',
+}
 
 const isSkinId = (value: unknown): value is SkinId =>
   typeof value === 'string' && roomSkins.some(skin => skin.id === value)
@@ -1127,6 +1140,7 @@ function PocketApp({ userHash }: { userHash: string }) {
     outfit.id === equippedOutfit && (outfit.companionId === null || outfit.companionId === companionId)
   ) ?? characterOutfits[0]
   const availableOutfits = characterOutfits.filter(outfit => outfit.companionId === null || outfit.companionId === companionId)
+  const availableRoomSkins = roomSkins.filter(skin => skin.companionId === null || skin.companionId === companionId)
   const dogStateMap = equippedClothes.states ?? activeCompanion.states
   const displayDogImage = dogStateMap[dogVisualState]
   const mateCompanion = companions.find(item => item.id === mateRoom.mateAvatar?.companionId) ?? companions[0]
@@ -1813,6 +1827,8 @@ function PocketApp({ userHash }: { userHash: string }) {
     const title = surveyCompanions.find(item => item.id === type)?.title ?? ''
     setSpendingType(type)
     setCompanionId(type)
+    setInventory(current => [...new Set<SkinId>([...current, COMPANION_ROOM[type]])])
+    setEquippedSkin(COMPANION_ROOM[type])
     setCompanionName(name)
     setOwnedCompanions(current => [...new Set<CompanionId>(['nunchi', ...current, type])])
     setEquippedOutfit('none')
@@ -1830,6 +1846,8 @@ function PocketApp({ userHash }: { userHash: string }) {
     const mate = companions.find(item => item.id === id) ?? companions[0]
     const applyEquip = () => {
       setCompanionId(id)
+      setInventory(current => [...new Set<SkinId>([...current, COMPANION_ROOM[id]])])
+      setEquippedSkin(COMPANION_ROOM[id])
       // 눈찌마다 체형이 달라 전용 옷만 쓸 수 있으므로 교체할 때 맨몸으로 맞춤
       if (id !== companionId && equippedOutfit !== 'none') {
         setEquippedOutfit('none')
@@ -2927,7 +2945,7 @@ function PocketApp({ userHash }: { userHash: string }) {
           </div>
           {shopTab === 'rooms' ? (
             <div className="skin-grid">
-              {roomSkins.map(skin => {
+              {availableRoomSkins.map(skin => {
                 const owned = inventory.includes(skin.id)
                 const equipped = equippedSkin === skin.id
                 return (
