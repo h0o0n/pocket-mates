@@ -2104,7 +2104,7 @@ function PocketApp({ userHash }: { userHash: string }) {
               className={`dog-wrap party-mate-dog ${dogMotion ? `is-busy motion-${dogMotion}` : 'is-idle'}`}
               style={{
                 left: '34%',
-                bottom: '-2%',
+                bottom: '4%',
               }}
             >
               {bubbleVisible && (
@@ -2143,7 +2143,7 @@ function PocketApp({ userHash }: { userHash: string }) {
               className="dog-wrap party-mate-dog is-idle"
               style={{
                 left: '66%',
-                bottom: '-2%',
+                bottom: '4%',
               }}
               aria-label={`${mateRoom.mateName} 눈찌`}
             >
