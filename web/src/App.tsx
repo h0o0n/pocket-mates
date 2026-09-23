@@ -453,6 +453,31 @@ const BASE_PARCEL_PROP_IMAGES = [
   '/assets/props/shopping/shopping-boxes.png',
 ] as const
 
+/** 확장 소비 유형 소품 — 같은 유형을 3번 기록하면 방 가장자리에 하나씩 등장 */
+const CATEGORY_ROOM_PROPS: Partial<Record<ExpenseCategory, string>> = {
+  groceries: '/assets/props/categories/groceries.png',
+  housing: '/assets/props/categories/housing.png',
+  health: '/assets/props/categories/health.png',
+  beauty: '/assets/props/categories/beauty.png',
+  education: '/assets/props/categories/education.png',
+  leisure: '/assets/props/categories/leisure.png',
+  travel: '/assets/props/categories/travel.png',
+  social: '/assets/props/categories/social.png',
+  pet: '/assets/props/categories/pet.png',
+}
+
+const CATEGORY_PROP_SLOTS = [
+  { x: 4, y: 4, size: 12, rotate: -5 },
+  { x: 84, y: 4, size: 11, rotate: 4 },
+  { x: 16, y: 2, size: 10, rotate: 3 },
+  { x: 73, y: 2, size: 10, rotate: -4 },
+  { x: 27, y: 3, size: 10, rotate: -2 },
+  { x: 63, y: 3, size: 11, rotate: 3 },
+  { x: 7, y: 24, size: 10, rotate: 4 },
+  { x: 83, y: 23, size: 10, rotate: -3 },
+  { x: 47, y: 2, size: 9, rotate: 2 },
+] as const
+
 /** 꾸미기에서 파는 추가 소품 (개인 방 소비 누적 풀에 합류) */
 const roomDecorProps: Array<{
   id: PropId
@@ -1135,6 +1160,12 @@ function PocketApp({ userHash }: { userHash: string }) {
     const seedExpense = shoppingExpenses[index * 3 + 2] ?? shoppingExpenses[index * 3]
     return parcelPropPool[stableIndex(seedExpense?.id ?? String(index), parcelPropPool.length)]
   })
+  const categoryRoomProps = Object.entries(CATEGORY_ROOM_PROPS)
+    .flatMap(([category, source]) => {
+      const count = currentMonthExpenses.filter(expense => expense.category === category).length
+      return count >= 3 && source ? [{ category, source }] : []
+    })
+    .slice(0, CATEGORY_PROP_SLOTS.length)
   const todayExpenseCount = expenses.filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey).length
   const todaySpent = expenses
     .filter(expense => new Date(expense.spentAt).toLocaleDateString('en-CA') === todayKey)
@@ -2206,6 +2237,23 @@ function PocketApp({ userHash }: { userHash: string }) {
                 key={`shopping-${index}-${source}`}
               />
             ))}
+            {categoryRoomProps.map(({ category, source }, index) => {
+              const slot = CATEGORY_PROP_SLOTS[index]
+              return (
+                <img
+                  className="room-prop category-room-prop"
+                  style={{
+                    '--prop-x': `${slot.x}%`,
+                    '--prop-y': `${slot.y}%`,
+                    '--prop-size': `${slot.size}%`,
+                    '--prop-rotate': `${slot.rotate}deg`,
+                  } as CSSProperties}
+                  src={source}
+                  alt=""
+                  key={`category-${category}`}
+                />
+              )
+            })}
           </div>
           <div
             ref={dogAreaRef}
