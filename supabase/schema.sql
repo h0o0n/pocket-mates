@@ -42,7 +42,9 @@ create table if not exists public.expenses (
   category text not null check (
     category in (
       'coffee', 'delivery', 'dining', 'transport', 'shopping',
-      'game', 'subscription', 'living', 'other'
+      'game', 'subscription', 'living', 'groceries', 'housing',
+      'health', 'beauty', 'education', 'leisure', 'travel',
+      'social', 'pet', 'other'
     )
   ),
   amount bigint not null check (amount > 0),
@@ -84,7 +86,9 @@ create table if not exists public.monthly_summaries (
   top_category text check (
     top_category is null or top_category in (
       'coffee', 'delivery', 'dining', 'transport', 'shopping',
-      'game', 'subscription', 'living', 'other'
+      'game', 'subscription', 'living', 'groceries', 'housing',
+      'health', 'beauty', 'education', 'leisure', 'travel',
+      'social', 'pet', 'other'
     )
   ),
   result_title text check (result_title is null or char_length(result_title) <= 80),
@@ -451,7 +455,7 @@ create table if not exists public.mate_shared_expenses (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.mate_rooms (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
-  category text not null check (category in ('coffee','delivery','dining','transport','shopping','game','subscription','living','other')),
+  category text not null check (category in ('coffee','delivery','dining','transport','shopping','game','subscription','living','groceries','housing','health','beauty','education','leisure','travel','social','pet','other')),
   amount bigint not null check (amount > 0),
   memo text check (memo is null or char_length(memo) <= 40),
   spent_at timestamptz not null,

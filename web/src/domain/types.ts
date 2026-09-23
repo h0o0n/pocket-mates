@@ -7,6 +7,15 @@ export const expenseCategories = [
   'game',
   'subscription',
   'living',
+  'groceries',
+  'housing',
+  'health',
+  'beauty',
+  'education',
+  'leisure',
+  'travel',
+  'social',
+  'pet',
   'other',
 ] as const
 

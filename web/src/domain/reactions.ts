@@ -15,6 +15,15 @@ const firstMessages: Record<ExpenseCategory, string> = {
   game: '눈찌가 플레이 시간을 확인하기 시작해요.',
   subscription: '이번 달에도 조용히 빠져나간 돈을 발견했어요.',
   living: '이건 눈치 줄 수 없는 지출이라 눈찌도 조용해요.',
+  groceries: '냉장고가 든든해졌고 잔액은 조금 가벼워졌어요.',
+  housing: '집을 지키는 데 돈이 꽤 드네요. 눈찌도 조용히 인정해요.',
+  health: '건강에는 눈치 주지 않기로 했어요. 기록만 잘 챙겨요.',
+  beauty: '기분 전환 비용까지 눈찌가 꼼꼼히 적었어요.',
+  education: '미래의 나에게 투자한 돈으로 기록했어요.',
+  leisure: '재미도 예산 안에 있으면 눈찌가 고개를 끄덕여요.',
+  travel: '추억은 남고 결제 내역도 함께 남았어요.',
+  social: '마음은 넉넉하게, 금액은 정확하게 기록했어요.',
+  pet: '이 지출은 귀여움으로 이미 결재가 끝난 것 같아요.',
   other: '눈찌가 어디에 쓴 돈인지 설명을 기다려요.',
 }
 
@@ -26,6 +35,15 @@ const repeatMessages: Partial<Record<ExpenseCategory, string>> = {
   shopping: '장바구니가 비워질수록 눈찌 표정도 차분해요.',
   game: '새 게임보다 안 끝낸 게임이 더 많지는 않은지 확인 중이에요.',
   subscription: '구독 서비스끼리 단체 모임을 만든 것 같아요.',
+  groceries: '냉장고가 이번 달에도 꽤 자주 채워지고 있어요.',
+  housing: '집이 이번 달 예산을 꾸준히 먹고 있어요.',
+  health: '건강 기록이 늘었어요. 몸도 잔액도 같이 챙겨요.',
+  beauty: '눈찌가 이번 달 꾸밈 비용을 슬쩍 합산했어요.',
+  education: '배운 만큼 통장도 똑똑해지면 좋겠어요.',
+  leisure: '취미가 슬슬 본업처럼 지출되고 있어요.',
+  travel: '여행의 여운보다 결제 알림이 오래가고 있어요.',
+  social: '챙길 사람이 많다는 건 좋은 일이… 맞겠죠?',
+  pet: '간식 봉지는 늘고 눈찌의 경쟁심도 커지고 있어요.',
 }
 
 const stageMessages = {

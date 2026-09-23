@@ -60,6 +60,11 @@ const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }
   { value: 'dining', label: '외식', emoji: '🍚' }, { value: 'transport', label: '교통', emoji: '🚌' },
   { value: 'shopping', label: '쇼핑', emoji: '📦' }, { value: 'game', label: '게임', emoji: '🎮' },
   { value: 'subscription', label: '구독', emoji: '📺' }, { value: 'living', label: '생활', emoji: '🧻' },
+  { value: 'groceries', label: '장보기', emoji: '🛒' }, { value: 'housing', label: '주거·공과금', emoji: '🏠' },
+  { value: 'health', label: '의료·건강', emoji: '🩺' }, { value: 'beauty', label: '미용', emoji: '💇' },
+  { value: 'education', label: '교육·책', emoji: '📚' }, { value: 'leisure', label: '취미·여가', emoji: '🎨' },
+  { value: 'travel', label: '여행', emoji: '✈️' }, { value: 'social', label: '경조사·선물', emoji: '🎁' },
+  { value: 'pet', label: '반려동물', emoji: '🐾' },
   { value: 'other', label: '기타', emoji: '✏️' },
 ]
 const copy = {
@@ -782,6 +787,15 @@ const parsePaymentSms = (
   if (/스타벅스|커피|카페|이디야|투썸|메가커피|컴포즈/.test(text)) category = 'coffee'
   else if (/배달|배민|요기요|쿠팡이츠|배달의민족/.test(text)) category = 'delivery'
   else if (/택시|카카오T|우버|버스|지하철|교통|티머니/.test(text)) category = 'transport'
+  else if (/이마트|롯데마트|홈플러스|마켓컬리|컬리|식자재|마트|장보기|정육|과일|슈퍼/.test(text)) category = 'groceries'
+  else if (/동물병원|펫|반려|사료|간식|애견|고양이/.test(text)) category = 'pet'
+  else if (/월세|관리비|전기|가스|수도|공과금|도시가스|전력/.test(text)) category = 'housing'
+  else if (/병원|의원|약국|치과|안과|건강|헬스|필라테스/.test(text)) category = 'health'
+  else if (/미용실|헤어|네일|뷰티|화장품|피부/.test(text)) category = 'beauty'
+  else if (/서점|교보문고|영풍문고|학원|강의|교육|도서/.test(text)) category = 'education'
+  else if (/영화|공연|전시|노래방|볼링|취미|티켓/.test(text)) category = 'leisure'
+  else if (/호텔|숙소|항공|여행|야놀자|여기어때|아고다/.test(text)) category = 'travel'
+  else if (/선물|축의금|부의금|경조사|꽃집|플라워/.test(text)) category = 'social'
   else if (/쿠팡|네이버페이|무신사|올리브영|다이소|쇼핑/.test(text)) category = 'shopping'
   else if (/넷플릭스|유튜브|스포티파이|디즈니|구독|멜론/.test(lower)) category = 'subscription'
   else if (/스팀|플레이스테이션|닌텐도|게임/.test(text)) category = 'game'
