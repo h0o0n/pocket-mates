@@ -789,6 +789,33 @@ const parsePaymentSms = (
   return { amount, memo, category, spentDate }
 }
 
+interface OcrExpenseDraft {
+  id: string
+  selected: boolean
+  spentDate: string
+  memo: string
+  amount: number
+  category: ExpenseCategory
+  duplicate: boolean
+}
+
+/** OCR 문장을 금액이 있는 줄 중심으로 묶어 결제 후보를 만듭니다. */
+const parsePaymentScreenshotText = (raw: string, fallbackDate: string): Omit<OcrExpenseDraft, 'id' | 'selected' | 'duplicate'>[] => {
+  const lines = raw.split(/\r?\n/).map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  const ignored = /(결제예정|이용한도|남은한도|누적|총액|합계|청구금액|보유포인트)/
+  const results: Omit<OcrExpenseDraft, 'id' | 'selected' | 'duplicate'>[] = []
+  lines.forEach((line, index) => {
+    if (ignored.test(line) || !/(\d{1,3}(?:,\d{3})+|\d{3,})\s*원?/.test(line)) return
+    const context = lines.slice(Math.max(0, index - 2), Math.min(lines.length, index + 2)).join(' ')
+    const parsed = parsePaymentSms(context) ?? parsePaymentSms(`${line}원`)
+    if (!parsed || parsed.amount < 100) return
+    results.push({ amount: parsed.amount, memo: parsed.memo || '사용처 확인', category: parsed.category ?? 'other', spentDate: parsed.spentDate ?? fallbackDate })
+  })
+  return results.filter((item, index, list) => list.findIndex(candidate =>
+    candidate.amount === item.amount && candidate.memo === item.memo && candidate.spentDate === item.spentDate
+  ) === index).slice(0, 30)
+}
+
 /** 일간/주간 미션 진행도를 id별로 계산합니다. */
 const missionProgressById = (
   id: string,
@@ -886,6 +913,9 @@ function PocketApp({ userHash }: { userHash: string }) {
   // 소비 기록 날짜 (YYYY-MM-DD). 기본은 오늘, 캘린더/문자에서 바꿀 수 있음.
   const [expenseDate, setExpenseDate] = useState(() => dateKey(new Date()))
   const [smsPaste, setSmsPaste] = useState('')
+  const [ocrDrafts, setOcrDrafts] = useState<OcrExpenseDraft[]>([])
+  const [ocrBusy, setOcrBusy] = useState(false)
+  const [ocrProgress, setOcrProgress] = useState(0)
   const [message, setMessage] = useState('')
   const [bubbleVisible, setBubbleVisible] = useState(false)
   const [dogLine, setDogLine] = useState('')
@@ -1674,6 +1704,63 @@ function PocketApp({ userHash }: { userHash: string }) {
     if (parsed.spentDate) setExpenseDate(parsed.spentDate)
     setSmsPaste('')
     setMessage(`${won(parsed.amount)}원${parsed.memo ? ` · ${parsed.memo}` : ''} 반영했어요. 확인하고 기록해 주세요.`)
+  }
+  const isDuplicateExpense = (draft: Pick<OcrExpenseDraft, 'spentDate' | 'amount' | 'memo'>) => expenses.some(expense =>
+    dateKey(new Date(expense.spentAt)) === draft.spentDate
+    && expense.amount === draft.amount
+    && (expense.memo ?? '').replace(/\s+/g, '') === draft.memo.replace(/\s+/g, '')
+  )
+  const readPaymentScreenshot = async (file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) return setMessage('이미지 파일만 선택할 수 있어요.')
+    setOcrBusy(true)
+    setOcrProgress(0)
+    setOcrDrafts([])
+    let worker: Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>> | null = null
+    try {
+      const { createWorker } = await import('tesseract.js')
+      const assetUrl = (path: string) => new URL(`${import.meta.env.BASE_URL}assets/ocr/${path}`, window.location.href).href
+      worker = await createWorker(['kor', 'eng'], undefined, {
+        workerPath: assetUrl('worker.min.js'),
+        corePath: assetUrl('tesseract-core-lstm.wasm.js'),
+        langPath: assetUrl('lang'),
+        logger: event => {
+          if (event.status === 'recognizing text') setOcrProgress(Math.round(event.progress * 100))
+        },
+      })
+      const result = await worker.recognize(file)
+      const drafts = parsePaymentScreenshotText(result.data.text, expenseDate).map(item => {
+        const duplicate = isDuplicateExpense(item)
+        return { ...item, id: crypto.randomUUID(), selected: !duplicate, duplicate }
+      })
+      setOcrDrafts(drafts)
+      setMessage(drafts.length ? `${drafts.length}건을 찾았어요. 틀린 내용이 없는지 확인해 주세요.` : '결제 내역을 찾지 못했어요. 더 선명한 캡처로 다시 시도해 주세요.')
+    } catch (error) {
+      console.error('payment screenshot OCR failed', error)
+      setMessage('캡처를 읽지 못했어요. 이미지가 선명한지 확인해 주세요.')
+    } finally {
+      await worker?.terminate().catch(() => undefined)
+      setOcrBusy(false)
+    }
+  }
+  const updateOcrDraft = <K extends keyof OcrExpenseDraft>(id: string, key: K, value: OcrExpenseDraft[K]) => {
+    setOcrDrafts(current => current.map(item => item.id === id ? { ...item, [key]: value, duplicate: false } : item))
+  }
+  const saveOcrDrafts = () => {
+    const selected = ocrDrafts.filter(item => item.selected && item.amount > 0 && item.memo.trim())
+    if (!selected.length) return setMessage('등록할 결제 내역을 선택해 주세요.')
+    const created = selected.map((item, index): Expense => {
+      const [year, month, day] = item.spentDate.split('-').map(Number)
+      return {
+        id: crypto.randomUUID(), category: item.category, amount: item.amount,
+        memo: item.memo.trim().slice(0, 40), spentAt: new Date(year, month - 1, day, 12, 0, index).toISOString(),
+      }
+    })
+    setExpenses(current => [...created, ...current])
+    setOcrDrafts([])
+    setExpenseSheetOpen(false)
+    playDogMotion('nod', 1000)
+    setMessage(`캡처에서 확인한 결제 ${created.length}건을 기록했어요.`)
   }
   const updatePlan = (key: 'monthlyIncome' | 'savingsGoal', value: string) => setDraftPlan(current => ({ ...current, [key]: numberFromInput(value) }))
   const setFixedExpenseItems = (items: FixedExpenseItem[]) => setDraftPlan(current => ({
@@ -3262,6 +3349,38 @@ function PocketApp({ userHash }: { userHash: string }) {
       >
         <div className="expense-sheet-frame">
           <form id="expense-sheet-form" className="expense-sheet-form" onSubmit={saveExpense}>
+            <section className="expense-section payment-capture-section" aria-label="결제내역 캡처 등록">
+              <div className="payment-capture-heading">
+                <div><p className="expense-section-label">결제내역 캡처</p><small>이미지는 기기에서만 읽고 저장하지 않아요.</small></div>
+                <label className={`payment-capture-button ${ocrBusy ? 'is-disabled' : ''}`}>
+                  <input type="file" accept="image/*" disabled={ocrBusy} onChange={event => { void readPaymentScreenshot(event.target.files?.[0]); event.currentTarget.value = '' }} />
+                  {ocrBusy ? '읽는 중' : '캡처 선택'}
+                </label>
+              </div>
+              {ocrBusy && (
+                <div className="ocr-progress" role="status"><i style={{ width: `${ocrProgress}%` }} /><span>{ocrProgress ? `${ocrProgress}% 분석 중` : '한글 인식 준비 중'}</span></div>
+              )}
+              {ocrDrafts.length > 0 && (
+                <div className="ocr-result-list">
+                  {ocrDrafts.map((draft, index) => (
+                    <article key={draft.id} className={`${draft.selected ? 'is-selected' : ''} ${draft.duplicate ? 'is-duplicate' : ''}`}>
+                      <label className="ocr-check"><input type="checkbox" checked={draft.selected} onChange={event => updateOcrDraft(draft.id, 'selected', event.target.checked)} /><span>{index + 1}</span></label>
+                      <div className="ocr-fields">
+                        <input type="date" max={dateKey(new Date())} value={draft.spentDate} onChange={event => updateOcrDraft(draft.id, 'spentDate', event.target.value)} aria-label={`${index + 1}번 결제 날짜`} />
+                        <input value={draft.memo} maxLength={40} onChange={event => updateOcrDraft(draft.id, 'memo', event.target.value)} aria-label={`${index + 1}번 사용처`} />
+                        <label className="ocr-amount"><input inputMode="numeric" value={formattedInput(draft.amount)} onChange={event => updateOcrDraft(draft.id, 'amount', numberFromInput(event.target.value))} aria-label={`${index + 1}번 금액`} /><span>원</span></label>
+                        <select value={draft.category} onChange={event => updateOcrDraft(draft.id, 'category', event.target.value as ExpenseCategory)} aria-label={`${index + 1}번 종류`}>
+                          {categories.map(item => <option key={item.value} value={item.value}>{item.emoji} {item.label}</option>)}
+                        </select>
+                      </div>
+                      {draft.duplicate && <small className="ocr-duplicate">이미 기록한 내역과 비슷해요</small>}
+                    </article>
+                  ))}
+                  <button type="button" className="ocr-save-all" onClick={saveOcrDrafts}>선택한 {ocrDrafts.filter(item => item.selected).length}건 기록하기</button>
+                </div>
+              )}
+            </section>
+
             {/* 0. 결제 문자 붙여넣기 → 금액/메모 자동 채움 */}
             <section className="expense-section" aria-label="결제 문자 붙여넣기">
               <p className="expense-section-label">결제 문자 붙여넣기</p>
