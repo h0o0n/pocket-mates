@@ -15,7 +15,15 @@ export type ExpenseCategory = (typeof expenseCategories)[number]
 export interface BudgetPlan {
   monthlyIncome: number
   fixedExpenses: number
+  fixedExpenseItems: FixedExpenseItem[]
   savingsGoal: number
+  cycleStartDay: number
+}
+
+export interface FixedExpenseItem {
+  id: string
+  name: string
+  amount: number
 }
 
 export interface Expense {

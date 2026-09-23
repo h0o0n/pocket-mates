@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEven
 import { loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework'
 import { Button, BottomSheet, ListHeader, ListRow, TextField } from '@toss/tds-mobile'
 import { TDSMobileAITProvider } from '@toss/tds-mobile-ait'
-import { calculateMonthlyBudget, createExpenseReaction, filterExpensesByMonth } from './domain/index.ts'
-import type { BudgetPlan, Expense, ExpenseCategory } from './domain/types.ts'
+import { calculateMonthlyBudget, createExpenseReaction, filterExpensesByMonth, getBudgetCycleRange } from './domain/index.ts'
+import type { BudgetPlan, Expense, ExpenseCategory, FixedExpenseItem } from './domain/types.ts'
 import {
   REWARD_AD_DAILY_LIMIT,
   REWARD_NYAM_PER_AD,
@@ -30,7 +30,31 @@ const NyamAmount = ({ amount, suffix = '냠' }: { amount: number; suffix?: strin
   </span>
 )
 
-const defaultPlan: BudgetPlan = { monthlyIncome: 3_000_000, fixedExpenses: 1_000_000, savingsGoal: 500_000 }
+const defaultPlan: BudgetPlan = {
+  monthlyIncome: 3_000_000,
+  fixedExpenses: 1_000_000,
+  fixedExpenseItems: [{ id: 'default-fixed', name: '기타 고정비', amount: 1_000_000 }],
+  savingsGoal: 500_000,
+  cycleStartDay: 1,
+}
+
+const normalizeBudgetPlan = (raw: Partial<BudgetPlan> | null | undefined): BudgetPlan => {
+  const legacyFixed = Math.max(0, Number(raw?.fixedExpenses ?? defaultPlan.fixedExpenses))
+  const items = Array.isArray(raw?.fixedExpenseItems)
+    ? raw.fixedExpenseItems.map((item, index) => ({
+      id: String(item.id || `fixed-${index}`),
+      name: String(item.name || '고정비').slice(0, 20),
+      amount: Math.max(0, Number(item.amount) || 0),
+    }))
+    : [{ id: 'legacy-fixed', name: '기존 고정비', amount: legacyFixed }]
+  return {
+    monthlyIncome: Math.max(0, Number(raw?.monthlyIncome ?? defaultPlan.monthlyIncome)),
+    fixedExpenses: items.reduce((sum, item) => sum + item.amount, 0),
+    fixedExpenseItems: items,
+    savingsGoal: Math.max(0, Number(raw?.savingsGoal ?? defaultPlan.savingsGoal)),
+    cycleStartDay: Math.min(31, Math.max(1, Math.trunc(Number(raw?.cycleStartDay ?? 1)) || 1)),
+  }
+}
 const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }> = [
   { value: 'coffee', label: '카페·커피', emoji: '☕' }, { value: 'delivery', label: '배달', emoji: '🍕' },
   { value: 'dining', label: '외식', emoji: '🍚' }, { value: 'transport', label: '교통', emoji: '🚌' },
@@ -840,7 +864,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [leaveMateConfirm, setLeaveMateConfirm] = useState(false)
   const [guideExpanded, setGuideExpanded] = useState(false)
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false)
-  const [plan, setPlan] = useState<BudgetPlan>(() => loadJson(k('plan'), defaultPlan))
+  const [plan, setPlan] = useState<BudgetPlan>(() => normalizeBudgetPlan(loadJson<Partial<BudgetPlan>>(k('plan'), defaultPlan)))
   const [draftPlan, setDraftPlan] = useState(plan)
   const [expenses, setExpenses] = useState<Expense[]>(() => loadJson(k('expenses'), []))
   const [category, setCategory] = useState<ExpenseCategory>('dining')
@@ -1005,11 +1029,18 @@ function PocketApp({ userHash }: { userHash: string }) {
     }
   }, [userHash])
 
-  // 잔액·stage·다락방 낡음은 '이번 달' 지출만 반영 (과거 달 누적 제외).
+  // 잔액·stage·방 상태는 사용자가 정한 월별 예산 주기의 지출만 반영합니다.
   const currentMonthExpenses = useMemo(
-    () => filterExpensesByMonth(expenses, todayKey),
-    [expenses, todayKey],
+    () => filterExpensesByMonth(expenses, todayKey, plan.cycleStartDay),
+    [expenses, todayKey, plan.cycleStartDay],
   )
+  const budgetCycleLabel = useMemo(() => {
+    const { start, end } = getBudgetCycleRange(todayKey, plan.cycleStartDay)
+    const inclusiveEnd = new Date(end)
+    inclusiveEnd.setDate(inclusiveEnd.getDate() - 1)
+    const shortDate = (date: Date) => `${date.getMonth() + 1}.${date.getDate()}`
+    return `${shortDate(start)} ~ ${shortDate(inclusiveEnd)}`
+  }, [todayKey, plan.cycleStartDay])
   const snapshot = useMemo(
     () => calculateMonthlyBudget(plan, currentMonthExpenses, todayKey),
     [plan, currentMonthExpenses, todayKey],
@@ -1559,9 +1590,13 @@ function PocketApp({ userHash }: { userHash: string }) {
 
   const savePlan = (event: FormEvent) => {
     event.preventDefault()
-    if (draftPlan.monthlyIncome <= 0) return setMessage('월급은 0원보다 크게 입력해 주세요.')
-    if (draftPlan.fixedExpenses + draftPlan.savingsGoal > draftPlan.monthlyIncome) return setMessage('고정비와 저축 목표가 월급보다 많아요.')
-    setPlan(draftPlan); setBudgetChecked(true); setMessage('이번 달 예산 설정을 확인했어요.')
+    const normalized = normalizeBudgetPlan(draftPlan)
+    if (normalized.monthlyIncome <= 0) return setMessage('월급은 0원보다 크게 입력해 주세요.')
+    if (normalized.fixedExpenses + normalized.savingsGoal > normalized.monthlyIncome) return setMessage('고정비와 저축 목표가 월급보다 많아요.')
+    setPlan(normalized)
+    setDraftPlan(normalized)
+    setBudgetChecked(true)
+    setMessage(`${normalized.cycleStartDay}일부터 시작하는 예산을 저장했어요.`)
   }
   /** 소비 시트 열기. 날짜를 넘기면 그날로, 없으면 오늘로 맞춥니다. */
   const openExpenseSheet = (preferredDate?: string) => {
@@ -1626,7 +1661,24 @@ function PocketApp({ userHash }: { userHash: string }) {
     setSmsPaste('')
     setMessage(`${won(parsed.amount)}원${parsed.memo ? ` · ${parsed.memo}` : ''} 반영했어요. 확인하고 기록해 주세요.`)
   }
-  const updatePlan = (key: keyof BudgetPlan, value: string) => setDraftPlan(current => ({ ...current, [key]: numberFromInput(value) }))
+  const updatePlan = (key: 'monthlyIncome' | 'savingsGoal', value: string) => setDraftPlan(current => ({ ...current, [key]: numberFromInput(value) }))
+  const setFixedExpenseItems = (items: FixedExpenseItem[]) => setDraftPlan(current => ({
+    ...current,
+    fixedExpenseItems: items,
+    fixedExpenses: items.reduce((sum, item) => sum + item.amount, 0),
+  }))
+  const addFixedExpenseItem = () => setFixedExpenseItems([
+    ...draftPlan.fixedExpenseItems,
+    { id: crypto.randomUUID(), name: '', amount: 0 },
+  ])
+  const updateFixedExpenseItem = (id: string, key: 'name' | 'amount', value: string) => {
+    setFixedExpenseItems(draftPlan.fixedExpenseItems.map(item => item.id === id
+      ? { ...item, [key]: key === 'amount' ? numberFromInput(value) : value.slice(0, 20) }
+      : item))
+  }
+  const removeFixedExpenseItem = (id: string) => setFixedExpenseItems(
+    draftPlan.fixedExpenseItems.filter(item => item.id !== id),
+  )
   const addQuickAmount = (value: number) => setAmount(current => String(numberFromInput(current) + value))
   const categoryInfo = (value: ExpenseCategory) => categories.find(x => x.value === value) ?? categories.at(-1)!
   const talkToDog = (event?: { currentTarget?: HTMLElement | null }) => {
@@ -2338,16 +2390,32 @@ function PocketApp({ userHash }: { userHash: string }) {
             verticalPadding="small"
           />
           <ListRow
+            contents={<ListRow.Texts type="2RowTypeA" top="현재 예산 기간" bottom={budgetCycleLabel} />}
+            verticalPadding="small"
+          />
+          <ListRow
             contents={<ListRow.Texts type="2RowTypeA" top="남은 돈" bottom={`${won(snapshot.remainingBalance)}원`} />}
             verticalPadding="small"
           />
           <ListRow
-            contents={<ListRow.Texts type="2RowTypeA" top="이번 달 사용" bottom={`${won(snapshot.totalSpent)}원`} />}
+            contents={<ListRow.Texts type="2RowTypeA" top="이번 주기 사용" bottom={`${won(snapshot.totalSpent)}원`} />}
             verticalPadding="small"
             border="none"
           />
           <ListHeader title={<ListHeader.TitleParagraph>예산 설정</ListHeader.TitleParagraph>} />
           <form className="panel-body" onSubmit={savePlan}>
+            <label className="budget-cycle-field">
+              <span>월별 시작일</span>
+              <select
+                value={draftPlan.cycleStartDay}
+                onChange={event => setDraftPlan(current => ({ ...current, cycleStartDay: Number(event.target.value) }))}
+              >
+                {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
+                  <option key={day} value={day}>매월 {day}일</option>
+                ))}
+              </select>
+              <small>급여일처럼 예산을 새로 시작할 날짜예요. 없는 날짜는 그달 마지막 날로 계산해요.</small>
+            </label>
             <TextField
               variant="box"
               label="월급"
@@ -2357,15 +2425,26 @@ function PocketApp({ userHash }: { userHash: string }) {
               onChange={event => updatePlan('monthlyIncome', event.target.value)}
               suffix="원"
             />
-            <TextField
-              variant="box"
-              label="매달 나가는 고정비"
-              labelOption="sustain"
-              inputMode="numeric"
-              value={formattedInput(draftPlan.fixedExpenses)}
-              onChange={event => updatePlan('fixedExpenses', event.target.value)}
-              suffix="원"
-            />
+            <section className="fixed-expense-editor">
+              <div className="fixed-expense-heading">
+                <div><b>고정비 항목</b><small>월세, 통신비처럼 매달 나가는 돈을 나눠 적어요.</small></div>
+                <button type="button" onClick={addFixedExpenseItem}>+ 추가</button>
+              </div>
+              {draftPlan.fixedExpenseItems.length === 0 && (
+                <button className="fixed-expense-empty" type="button" onClick={addFixedExpenseItem}>첫 고정비 항목 추가하기</button>
+              )}
+              {draftPlan.fixedExpenseItems.map((item, index) => (
+                <div className="fixed-expense-row" key={item.id}>
+                  <input aria-label={`고정비 ${index + 1} 항목명`} value={item.name} placeholder="예: 월세" onChange={event => updateFixedExpenseItem(item.id, 'name', event.target.value)} />
+                  <label>
+                    <input aria-label={`${item.name || `고정비 ${index + 1}`} 금액`} inputMode="numeric" value={formattedInput(item.amount)} placeholder="0" onChange={event => updateFixedExpenseItem(item.id, 'amount', event.target.value)} />
+                    <span>원</span>
+                  </label>
+                  <button type="button" aria-label={`${item.name || `고정비 ${index + 1}`} 삭제`} onClick={() => removeFixedExpenseItem(item.id)}>×</button>
+                </div>
+              ))}
+              <div className="fixed-expense-total"><span>고정비 합계</span><strong>{won(draftPlan.fixedExpenses)}원</strong></div>
+            </section>
             <TextField
               variant="box"
               label="저축 목표"

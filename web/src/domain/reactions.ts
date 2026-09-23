@@ -43,6 +43,7 @@ export const createExpenseReaction = (
   const monthExpenses = filterExpensesByMonth(
     [...previousExpenses, newExpense],
     newExpense.spentAt,
+    plan.cycleStartDay,
   )
   const snapshot = calculateBudget(plan, monthExpenses)
   const categoryCount = monthExpenses.filter(

@@ -13,7 +13,9 @@ import type { BudgetPlan, Expense } from './types.ts'
 const plan: BudgetPlan = {
   monthlyIncome: 3_000_000,
   fixedExpenses: 1_000_000,
+  fixedExpenseItems: [{ id: 'fixed-1', name: '고정비', amount: 1_000_000 }],
   savingsGoal: 500_000,
+  cycleStartDay: 1,
 }
 
 const expense = (
@@ -106,4 +108,16 @@ test('반응 로직도 새 지출이 속한 달만 보고 카테고리 횟수를
   // 8월 delivery는 제외 → 9월 3회만 카운트
   assert.equal(reaction.categoryCount, 3)
   assert.match(reaction.message, /냉장고와의 협상/)
+})
+
+test('월별 시작일을 기준으로 사용자 예산 주기의 지출만 계산한다', () => {
+  const paydayPlan = { ...plan, cycleStartDay: 25 }
+  const list = [
+    expense('before', 10_000, 'coffee', '2026-08-24T12:00:00+09:00'),
+    expense('start', 20_000, 'coffee', '2026-08-25T12:00:00+09:00'),
+    expense('current', 30_000, 'coffee', '2026-09-10T12:00:00+09:00'),
+    expense('next', 40_000, 'coffee', '2026-09-25T12:00:00+09:00'),
+  ]
+  const result = calculateMonthlyBudget(paydayPlan, list, '2026-09-10T12:00:00+09:00')
+  assert.equal(result.totalSpent, 50_000)
 })
