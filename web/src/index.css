@@ -661,6 +661,19 @@ body.is-expense-sheet-open .app-shell {
   padding: 12px 12px;
   border-top: 1px solid var(--pm-line);
 }
+.expense-list .expense-date-divider {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding: 12px 12px 7px;
+  border-top: 0;
+  border-bottom: 1px solid var(--pm-line);
+  color: var(--pm-text);
+}
+.expense-list .expense-date-divider:first-child { margin-top: 0; }
+.expense-list .expense-date-divider span { font-size: 13px; font-weight: 800; }
+.expense-list .expense-date-divider small { color: var(--pm-text-sub); font-size: 11px; font-weight: 600; }
 .category-icon {
   display: grid;
   place-items: center;

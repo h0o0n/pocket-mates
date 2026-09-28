@@ -1659,6 +1659,13 @@ function PocketApp({ userHash }: { userHash: string }) {
   const visibleListExpenses = periodExpenses
     .filter(expense => listCategory === 'all' || expense.category === listCategory)
     .sort((a, b) => Date.parse(b.spentAt) - Date.parse(a.spentAt))
+  const visibleListExpenseGroups = visibleListExpenses.reduce<Array<{ date: string; expenses: Expense[] }>>((groups, expense) => {
+    const date = dateKey(new Date(expense.spentAt))
+    const latest = groups.at(-1)
+    if (latest?.date === date) latest.expenses.push(expense)
+    else groups.push({ date, expenses: [expense] })
+    return groups
+  }, [])
   const listTotal = visibleListExpenses.reduce((sum, expense) => sum + expense.amount, 0)
   const reportMonthExpenses = useMemo(() => expenses.filter(expense => {
     const spent = new Date(expense.spentAt)
@@ -3035,25 +3042,35 @@ function PocketApp({ userHash }: { userHash: string }) {
               ) : (
                 <>
                   <ul className="expense-list">
-                    {visibleListExpenses.map(expense => {
-                      const info = categoryInfo(expense.category)
-                      return (
-                        <li key={expense.id}>
-                          <span className="category-icon">{info.emoji}</span>
-                          <div>
-                            <b>{expense.memo}</b>
-                            <small>{info.label} · {new Date(expense.spentAt).toLocaleDateString('ko-KR')}</small>
-                          </div>
-                          <strong>-{won(expense.amount)}원</strong>
-                          <button
-                            aria-label={`${expense.memo} 삭제`}
-                            type="button"
-                            onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
-                          >
-                            ×
-                          </button>
-                        </li>
-                      )
+                    {visibleListExpenseGroups.flatMap(group => {
+                      const groupDate = parseDateKey(group.date)
+                      const groupTotal = group.expenses.reduce((sum, expense) => sum + expense.amount, 0)
+                      return [
+                        <li className="expense-date-divider" key={`date-${group.date}`}>
+                          <span>{groupDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</span>
+                          <small>{group.expenses.length}건 · {won(groupTotal)}원</small>
+                        </li>,
+                        ...group.expenses.map(expense => {
+                          const info = categoryInfo(expense.category)
+                          return (
+                            <li key={expense.id}>
+                              <span className="category-icon">{info.emoji}</span>
+                              <div>
+                                <b>{expense.memo}</b>
+                                <small>{info.label}</small>
+                              </div>
+                              <strong>-{won(expense.amount)}원</strong>
+                              <button
+                                aria-label={`${expense.memo} 삭제`}
+                                type="button"
+                                onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          )
+                        }),
+                      ]
                     })}
                   </ul>
                   <div className="action-row">
