@@ -1694,6 +1694,10 @@ function PocketApp({ userHash }: { userHash: string }) {
     return totals
   }, {})
   const reportTopDay = Object.entries(reportDayTotals).sort((a, b) => b[1] - a[1])[0]
+  const reportLargestExpense = reportMonthExpenses.reduce<Expense | null>(
+    (largest, expense) => !largest || expense.amount > largest.amount ? expense : largest,
+    null,
+  )
   const reportDaysInMonth = new Date(listYear, listMonth + 1, 0).getDate()
   const reportMonthStart = new Date(listYear, listMonth, 1)
   const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -1702,7 +1706,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     : reportMonthStart.getTime() === currentMonthStart.getTime()
       ? new Date().getDate()
       : reportDaysInMonth
-  const reportNoSpendDays = Math.max(0, reportElapsedDays - Object.keys(reportDayTotals).length)
   const reportDailyAverage = reportElapsedDays > 0 ? Math.round(reportTotal / reportElapsedDays) : 0
   const reportBudgetRatio = snapshot.spendableBudget > 0 ? Math.round((reportTotal / snapshot.spendableBudget) * 100) : 0
   const reportComment = reportMonthExpenses.length === 0
@@ -2846,7 +2849,7 @@ function PocketApp({ userHash }: { userHash: string }) {
 
               <div className="report-stats">
                 <article><span>하루 평균</span><b>{won(reportDailyAverage)}원</b></article>
-                <article><span>무지출 일수</span><b>{reportNoSpendDays}일</b></article>
+                <article><span>가장 큰 결제</span><b>{reportLargestExpense ? `${won(reportLargestExpense.amount)}원` : '-'}</b></article>
                 <article><span>기록 건수</span><b>{reportMonthExpenses.length}건</b></article>
                 <article><span>가장 많이 쓴 날</span><b>{reportTopDay ? `${Number(reportTopDay[0].slice(-2))}일` : '-'}</b></article>
               </div>
