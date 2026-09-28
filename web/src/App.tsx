@@ -367,16 +367,26 @@ const companionOutfitStates = (
   eating: `/assets/characters/companions/${companionId}/outfits/${outfitId}/${animal}-eating.png`,
 })
 
-type RoomSkin = { id: SkinId; name: string; description: string; price: number; image: string; companionId: CompanionId | null }
+type RoomWearStage = 'comfortable' | 'tight' | 'broke'
+
+type RoomSkin = {
+  id: SkinId
+  name: string
+  description: string
+  price: number
+  image: string
+  companionId: CompanionId | null
+  stageImages?: Record<RoomWearStage, string>
+}
 
 const roomSkins: RoomSkin[] = [
   { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png', companionId: null },
-  { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png', companionId: null },
-  { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png', companionId: null },
-  { id: 'nunchi-room', name: '눈찌 다락', description: '영수증을 조용히 세기 좋은 눈찌의 작은 다락', price: 0, image: '/assets/rooms/companions/nunchi-attic.png', companionId: 'nunchi' },
-  { id: 'foodie-room', name: '곰찌 부엌', description: '간식 냄새가 잔액보다 먼저 퍼지는 아늑한 부엌', price: 0, image: '/assets/rooms/companions/foodie-kitchen.png', companionId: 'foodie' },
-  { id: 'shopper-room', name: '너굴 작업실', description: '택배를 뜯고 상자를 정리하는 척하기 좋은 방', price: 0, image: '/assets/rooms/companions/shopper-studio.png', companionId: 'shopper' },
-  { id: 'subscriber-room', name: '물개 라운지', description: '구독 해지는 잊고 콘텐츠는 보기 좋은 바닷빛 방', price: 0, image: '/assets/rooms/companions/subscriber-lounge.png', companionId: 'subscriber' },
+  { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png', companionId: null, stageImages: { comfortable: '/assets/rooms/skins/cafe-corner.png', tight: '/assets/rooms/skins/cafe-corner-tight.webp', broke: '/assets/rooms/skins/cafe-corner-broke.webp' } },
+  { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png', companionId: null, stageImages: { comfortable: '/assets/rooms/skins/beach-cabin.png', tight: '/assets/rooms/skins/beach-cabin-tight.webp', broke: '/assets/rooms/skins/beach-cabin-broke.webp' } },
+  { id: 'nunchi-room', name: '눈찌 다락', description: '눈찌를 얻으면 해금 · 방만 350냠에 구입 가능', price: 350, image: '/assets/rooms/companions/nunchi-attic.png', companionId: 'nunchi', stageImages: { comfortable: '/assets/rooms/companions/nunchi-attic.png', tight: '/assets/rooms/companions/nunchi-attic-tight.webp', broke: '/assets/rooms/companions/nunchi-attic-broke.webp' } },
+  { id: 'foodie-room', name: '곰찌 부엌', description: '곰찌를 얻으면 해금 · 방만 350냠에 구입 가능', price: 350, image: '/assets/rooms/companions/foodie-kitchen.png', companionId: 'foodie', stageImages: { comfortable: '/assets/rooms/companions/foodie-kitchen.png', tight: '/assets/rooms/companions/foodie-kitchen-tight.webp', broke: '/assets/rooms/companions/foodie-kitchen-broke.webp' } },
+  { id: 'shopper-room', name: '너굴 작업실', description: '너굴을 얻으면 해금 · 방만 350냠에 구입 가능', price: 350, image: '/assets/rooms/companions/shopper-studio.png', companionId: 'shopper', stageImages: { comfortable: '/assets/rooms/companions/shopper-studio.png', tight: '/assets/rooms/companions/shopper-studio-tight.webp', broke: '/assets/rooms/companions/shopper-studio-broke.webp' } },
+  { id: 'subscriber-room', name: '물개 라운지', description: '물개를 얻으면 해금 · 방만 350냠에 구입 가능', price: 350, image: '/assets/rooms/companions/subscriber-lounge.png', companionId: 'subscriber', stageImages: { comfortable: '/assets/rooms/companions/subscriber-lounge.png', tight: '/assets/rooms/companions/subscriber-lounge-tight.webp', broke: '/assets/rooms/companions/subscriber-lounge-broke.webp' } },
 ]
 
 const COMPANION_ROOM: Record<CompanionId, SkinId> = {
@@ -1247,7 +1257,14 @@ function PocketApp({ userHash }: { userHash: string }) {
   const foodLevel = foodRatio >= .2 ? 2 : foodRatio >= .1 ? 1 : 0
   const [status, line] = copy[snapshot.stage]
   const equippedRoom = roomSkins.find(skin => skin.id === equippedSkin) ?? roomSkins[0]
-  const roomImage = equippedSkin === 'attic' ? roomImages[snapshot.stage] : equippedRoom.image
+  const roomWearStage: RoomWearStage = snapshot.stage === 'relaxed' || snapshot.stage === 'watching'
+    ? 'comfortable'
+    : snapshot.stage === 'calculating'
+      ? 'tight'
+      : 'broke'
+  const roomImage = equippedSkin === 'attic'
+    ? roomImages[snapshot.stage]
+    : equippedRoom.stageImages?.[roomWearStage] ?? equippedRoom.image
   // 식비·예산·먹기 모션에 따라 상태 키를 고르고, 착용 옷의 같은 상태 PNG를 씁니다 (guide.md).
   const dogVisualState: DogVisualState = dogMotion === 'eat'
     ? 'eating'
@@ -1263,7 +1280,8 @@ function PocketApp({ userHash }: { userHash: string }) {
     outfit.id === equippedOutfit && (outfit.companionId === null || outfit.companionId === companionId)
   ) ?? characterOutfits[0]
   const availableOutfits = characterOutfits.filter(outfit => outfit.companionId === null || outfit.companionId === companionId)
-  const availableRoomSkins = roomSkins.filter(skin => skin.companionId === null || skin.companionId === companionId)
+  // 방과 눈찌 선택은 서로 독립적이다. 모든 방을 둘러보고 냠으로 먼저 살 수도 있다.
+  const availableRoomSkins = roomSkins
   const dogStateMap = equippedClothes.states ?? activeCompanion.states
   const displayDogImage = dogStateMap[dogVisualState]
   const mateCompanion = companions.find(item => item.id === mateRoom.mateAvatar?.companionId) ?? companions[0]
@@ -1298,6 +1316,15 @@ function PocketApp({ userHash }: { userHash: string }) {
   // 설문 결과는 유형 눈찌만 (기본 강아지 제외)
   const resultCompanion = surveyCompanions.find(item => item.id === (surveyResultType ?? 'foodie'))
     ?? surveyCompanions[0]!
+
+  // 기존 사용자도 이미 보유한 눈찌의 기본 방을 자동으로 영구 해금한다.
+  useEffect(() => {
+    setInventory(current => {
+      const unlockedRooms = ownedCompanions.map(id => COMPANION_ROOM[id])
+      const missingRooms = unlockedRooms.filter(roomId => !current.includes(roomId))
+      return missingRooms.length > 0 ? [...current, ...missingRooms] : current
+    })
+  }, [ownedCompanions])
 
   useEffect(() => saveJson(k('plan'), plan), [plan, userHash])
   useEffect(() => saveJson(k('expenses'), expenses), [expenses, userHash])
@@ -2018,7 +2045,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     setSpendingType(type)
     setCompanionId(type)
     setInventory(current => [...new Set<SkinId>([...current, COMPANION_ROOM[type]])])
-    setEquippedSkin(COMPANION_ROOM[type])
     setCompanionName(name)
     setOwnedCompanions(current => [...new Set<CompanionId>(['nunchi', ...current, type])])
     setEquippedOutfit('none')
@@ -2037,7 +2063,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     const applyEquip = () => {
       setCompanionId(id)
       setInventory(current => [...new Set<SkinId>([...current, COMPANION_ROOM[id]])])
-      setEquippedSkin(COMPANION_ROOM[id])
       // 눈찌마다 체형이 달라 전용 옷만 쓸 수 있으므로 교체할 때 맨몸으로 맞춤
       if (id !== companionId && equippedOutfit !== 'none') {
         setEquippedOutfit('none')
@@ -2275,7 +2300,6 @@ function PocketApp({ userHash }: { userHash: string }) {
           aria-label={`${companionName}의 방`}
         >
           <img className="room-art room-breathe" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
-          {equippedSkin !== 'attic' && <div className="skin-wear" aria-hidden="true" />}
           <div className="prop-layer" aria-hidden="true">
             {deliveryPiles.map((source, index) => (
               <img
