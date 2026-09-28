@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework'
+import { graniteEvent, loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework'
 import { Button, BottomSheet, ListHeader, ListRow, TextField } from '@toss/tds-mobile'
 import { TDSMobileAITProvider } from '@toss/tds-mobile-ait'
 import { calculateMonthlyBudget, createExpenseReaction, filterExpensesByMonth, getBudgetCycleRange } from './domain/index.ts'
@@ -1342,6 +1342,12 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('ui-theme'), themeId), [themeId, userHash])
   useEffect(() => saveJson(k('mate-room'), mateRoom), [mateRoom, userHash])
   useEffect(() => saveJson(k(`mate-mission-hidden-${todayKey}`), teamMissionHidden), [teamMissionHidden, userHash, todayKey])
+  useEffect(() => {
+    if (activePanel !== 'settings') return
+    return graniteEvent.addEventListener('backEvent', {
+      onEvent: () => setActivePanel('expense'),
+    })
+  }, [activePanel])
   useEffect(() => {
     if (!isSupabaseConfigured) return
     void loadMateRoom().then(room => {
@@ -3388,7 +3394,6 @@ function PocketApp({ userHash }: { userHash: string }) {
       {activePanel === 'settings' && (
         <section className="panel-card settings-panel">
           <header className="settings-page-header">
-            <button type="button" onClick={() => setActivePanel('expense')} aria-label="설정 닫고 돌아가기">‹</button>
             <h2>설정</h2>
             <span>눈찌주는 가계부</span>
           </header>

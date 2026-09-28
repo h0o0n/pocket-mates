@@ -151,8 +151,7 @@ body.is-expense-sheet-open .app-shell {
 .settings-page-open .floating-tab,
 .settings-page-open .fab-add { display: none; }
 .settings-page-open .settings-panel { min-height: 100%; margin: 0; border-radius: 0; }
-.settings-page-header { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; min-height: 54px; padding: calc(8px + env(safe-area-inset-top, 0px)) 18px 8px; border-bottom: 1px solid var(--pm-line); }
-.settings-page-header button { display: grid; width: 36px; height: 36px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: var(--pm-tint); color: var(--pm-text); font-size: 28px; line-height: 1; }
+.settings-page-header { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 54px; padding: calc(8px + env(safe-area-inset-top, 0px)) 18px 8px; border-bottom: 1px solid var(--pm-line); }
 .settings-page-header h2 { margin: 0; font-size: 19px; }
 .settings-page-header span { color: var(--pm-text-sub); font-size: 11px; }
 .hero-settings-button {
