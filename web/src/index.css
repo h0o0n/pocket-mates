@@ -1095,15 +1095,12 @@ body.is-expense-sheet-open .app-shell {
 }
 .category-scroll {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 0 -20px;
-  padding: 2px 20px 6px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
+  margin: 0;
+  padding: 2px 0 6px;
+  overflow: visible;
 }
-.category-scroll::-webkit-scrollbar { display: none; }
 .category-chip {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1121,7 +1118,6 @@ body.is-expense-sheet-open .app-shell {
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  scroll-snap-align: start;
 }
 .category-chip span {
   font-size: 15px;
