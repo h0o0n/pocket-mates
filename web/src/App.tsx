@@ -760,6 +760,45 @@ const pickWeeklyMissionIds = (
  * 카드/뱅킹 결제 문자에서 금액·가맹점을 뽑습니다.
  * 형식이 제각각이라 완벽하진 않고, 못 찾으면 null을 돌려 수동 입력을 유도합니다.
  */
+const parsePaymentDate = (raw: string, reference = new Date()): string | undefined => {
+  const text = raw.replace(/\s+/g, ' ')
+  const fullDate = text.match(/(?:^|\D)(\d{4}|\d{2})\s*(?:[-./]|년)\s*(\d{1,2})\s*(?:[-./]|월)\s*(\d{1,2})(?:\s*일)?(?:\D|$)/)
+  const koreanDate = text.match(/(?:^|\D)(\d{1,2})\s*월\s*(\d{1,2})\s*일?(?:\D|$)/)
+  const shortDate = !fullDate && !koreanDate
+    ? text.match(/(?:^|\D)(\d{1,2})\s*[/.]\s*(\d{1,2})(?:\D|$)/)
+    : null
+
+  let year = reference.getFullYear()
+  let month: number
+  let day: number
+  if (fullDate) {
+    year = Number(fullDate[1])
+    if (year < 100) year += 2000
+    month = Number(fullDate[2])
+    day = Number(fullDate[3])
+  } else {
+    const match = koreanDate ?? shortDate
+    if (!match) return undefined
+    month = Number(match[1])
+    day = Number(match[2])
+  }
+
+  let parsed = new Date(year, month - 1, day, 12)
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+  ) return undefined
+
+  // 연도가 없는 카드 내역은 현재보다 미래로 잡히면 전년도 거래로 봅니다.
+  if (!fullDate && parsed.getTime() > reference.getTime()) {
+    parsed = new Date(year - 1, month - 1, day, 12)
+  }
+  // 캡처에 잘못 인식된 미래 연도가 들어가면 자동 등록하지 않습니다.
+  if (parsed.getTime() > reference.getTime()) return undefined
+  return dateKey(parsed)
+}
+
 const parsePaymentSms = (
   raw: string,
 ): { amount: number; memo: string; category?: ExpenseCategory; spentDate?: string } | null => {
@@ -773,30 +812,16 @@ const parsePaymentSms = (
   const amount = Number(amountMatch[1].replace(/,/g, ''))
   if (!Number.isFinite(amount) || amount <= 0) return null
 
-  // 문자에 적힌 날짜가 있으면 시트 뱃지에 반영합니다.
-  let spentDate: string | undefined
-  const ymd = text.match(/(\d{4})-(\d{2})-(\d{2})/)
-  if (ymd) {
-    spentDate = `${ymd[1]}-${ymd[2]}-${ymd[3]}`
-  } else {
-    const md = text.match(/(\d{1,2})\/(\d{1,2})/)
-    if (md) {
-      const now = new Date()
-      const month = Number(md[1]) - 1
-      const day = Number(md[2])
-      let parsed = new Date(now.getFullYear(), month, day)
-      // 미래 날짜면 작년으로 보정 (연말→연초 문자)
-      if (parsed.getTime() > now.getTime()) parsed = new Date(now.getFullYear() - 1, month, day)
-      spentDate = dateKey(parsed)
-    }
-  }
+  // 카드사마다 다른 날짜 표기(2026.09.25, 09/25, 9월 25일)를 함께 처리합니다.
+  const spentDate = parsePaymentDate(text)
 
   // 금액·승인/일시불 등 잡음을 지운 뒤 가맹점 후보를 찾습니다.
   let rest = text
     .replace(amountMatch[0], ' ')
     .replace(/\[.*?\]/g, ' ')
     .replace(/\d{1,2}\/\d{1,2}(\s+\d{1,2}:\d{2})?/g, ' ')
-    .replace(/\d{4}-\d{2}-\d{2}/g, ' ')
+    .replace(/(?:\d{4}|\d{2})\s*[-./]\s*\d{1,2}\s*[-./]\s*\d{1,2}/g, ' ')
+    .replace(/\d{1,2}\s*월\s*\d{1,2}\s*일?/g, ' ')
     .replace(/(승인|취소|일시불|할부|체크|신용|출금|결제|사용|잔액|Web발신|웹발신)/gi, ' ')
     .replace(/(신한|국민|KB|우리|하나|농협|NH|카카오뱅크|토스|삼성|현대|롯데|BC|씨티|IBK|기업|수협|광주|전북|제주|카드|뱅크|은행)/gi, ' ')
     .replace(/[*＊]+/g, ' ')
@@ -844,11 +869,34 @@ const parsePaymentScreenshotText = (raw: string, fallbackDate: string): Omit<Ocr
   const ignored = /(결제예정|이용한도|남은한도|누적|총액|합계|청구금액|보유포인트)/
   const results: Omit<OcrExpenseDraft, 'id' | 'selected' | 'duplicate'>[] = []
   lines.forEach((line, index) => {
+    const withoutDate = line
+      .replace(/(?:\d{4}|\d{2})\s*(?:[-./]|년)\s*\d{1,2}\s*(?:[-./]|월)\s*\d{1,2}\s*일?/g, ' ')
+      .replace(/\d{1,2}\s*월\s*\d{1,2}\s*일?/g, ' ')
+      .replace(/\d{1,2}\s*[/.]\s*\d{1,2}/g, ' ')
+    const hasAmountOutsideDate = /(\d{1,3}(?:,\d{3})+|\d{3,})\s*원?|(?:KRW|₩)\s*\d+/i.test(withoutDate)
+    if (parsePaymentDate(line) && !hasAmountOutsideDate) return
     if (ignored.test(line) || !/(\d{1,3}(?:,\d{3})+|\d{3,})\s*원?/.test(line)) return
     const context = lines.slice(Math.max(0, index - 2), Math.min(lines.length, index + 2)).join(' ')
     const parsed = parsePaymentSms(context) ?? parsePaymentSms(`${line}원`)
     if (!parsed || parsed.amount < 100) return
-    results.push({ amount: parsed.amount, memo: parsed.memo || '사용처 확인', category: parsed.category ?? 'other', spentDate: parsed.spentDate ?? fallbackDate })
+    // 금액 줄에서 가까운 날짜를 먼저 사용하고, 캡처 전체의 날짜는 마지막 보조값으로 사용합니다.
+    const nearbyOffsets = [0, -1, 1, -2, 2, -3, 3]
+    const nearbyDate = nearbyOffsets
+      .map(offset => lines[index + offset])
+      .filter((candidate): candidate is string => Boolean(candidate))
+      .map(candidate => parsePaymentDate(candidate))
+      .find(Boolean)
+    const precedingDate = [...lines.slice(0, index + 1)]
+      .reverse()
+      .map(candidate => parsePaymentDate(candidate))
+      .find(Boolean)
+    const screenshotDate = lines.map(candidate => parsePaymentDate(candidate)).find(Boolean)
+    results.push({
+      amount: parsed.amount,
+      memo: parsed.memo || '사용처 확인',
+      category: parsed.category ?? 'other',
+      spentDate: nearbyDate ?? precedingDate ?? parsed.spentDate ?? screenshotDate ?? fallbackDate,
+    })
   })
   return results.filter((item, index, list) => list.findIndex(candidate =>
     candidate.amount === item.amount && candidate.memo === item.memo && candidate.spentDate === item.spentDate
