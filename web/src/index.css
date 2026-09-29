@@ -909,6 +909,20 @@ body.is-expense-sheet-open .app-shell {
   font-size: 13px;
   line-height: 1.45;
 }
+.shop-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 18px 8px;
+  color: var(--pm-text);
+  font-size: 14px;
+}
+.shop-section-title span {
+  color: var(--pm-text-sub);
+  font-size: 11px;
+  text-align: right;
+}
 .shop-lock-hint b {
   color: var(--pm-text);
   font-weight: 700;
@@ -1351,6 +1365,26 @@ body.is-expense-sheet-open .app-shell {
   z-index: 4;
   pointer-events: none;
 }
+.furnishing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.room-furnishing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: prop-arrive 0.3s ease-out both;
+}
+.furnishing-rug { z-index: 1; }
+.furnishing-bed,
+.furnishing-lighting,
+.furnishing-storage,
+.furnishing-wall { z-index: 2; }
+.furnishing-window { z-index: 3; }
 .room-prop {
   position: absolute;
   object-fit: contain;

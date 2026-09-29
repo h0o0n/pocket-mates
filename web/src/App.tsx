@@ -107,7 +107,7 @@ const roomImages = {
   speechless: '/assets/rooms/budget-states/attic-broke.png',
 } as const
 
-type SkinId = 'attic' | 'cafe' | 'beach' | 'nunchi-room' | 'foodie-room' | 'shopper-room' | 'subscriber-room'
+type SkinId = 'attic' | 'empty-attic' | 'cafe' | 'beach' | 'nunchi-room' | 'foodie-room' | 'shopper-room' | 'subscriber-room'
 type OutfitId =
   | 'none' | 'scarf' | 'sweater' | 'raincoat'
   | 'bear-gingham-bib' | 'bear-honey-cape' | 'bear-cook-apron'
@@ -404,6 +404,7 @@ type RoomSkin = {
 
 const roomSkins: RoomSkin[] = [
   { id: 'attic', name: '다락방', description: '기본 지급 · 잔액에 따라 제대로 낡아갑니다.', price: 0, image: '/assets/rooms/budget-states/attic-cozy.png', companionId: null },
+  { id: 'empty-attic', name: '햇살 빈방', description: '기본 지급 · 산뜻한 빈 공간을 직접 꾸미는 방', price: 0, image: '/assets/rooms/customizable/empty-attic.png', companionId: null },
   { id: 'cafe', name: '골목 카페', description: '커피값 영수증이 쌓이기 좋은 방', price: 300, image: '/assets/rooms/skins/cafe-corner.png', companionId: null, stageImages: { comfortable: '/assets/rooms/skins/cafe-corner.png', tight: '/assets/rooms/skins/cafe-corner-tight.webp', broke: '/assets/rooms/skins/cafe-corner-broke.webp' } },
   { id: 'beach', name: '바다 오두막', description: '파도 소리만 결제 알림보다 큰 방', price: 450, image: '/assets/rooms/skins/beach-cabin.png', companionId: null, stageImages: { comfortable: '/assets/rooms/skins/beach-cabin.png', tight: '/assets/rooms/skins/beach-cabin-tight.webp', broke: '/assets/rooms/skins/beach-cabin-broke.webp' } },
   { id: 'nunchi-room', name: '눈찌 다락', description: '눈찌를 얻으면 해금 · 방만 350냠에 구입 가능', price: 350, image: '/assets/rooms/companions/nunchi-attic.png', companionId: 'nunchi', stageImages: { comfortable: '/assets/rooms/companions/nunchi-attic.png', tight: '/assets/rooms/companions/nunchi-attic-tight.webp', broke: '/assets/rooms/companions/nunchi-attic-broke.webp' } },
@@ -425,11 +426,54 @@ const isSkinId = (value: unknown): value is SkinId =>
 /** 삭제된 스킨(구름방 등)을 보유·장착 중이어도 다락방으로 정리 */
 const sanitizeSkinInventory = (raw: unknown): SkinId[] => {
   const list = Array.isArray(raw) ? raw.filter(isSkinId) : []
-  return [...new Set<SkinId>(['attic', ...list])]
+  return [...new Set<SkinId>(['attic', 'empty-attic', ...list])]
 }
 
 const sanitizeEquippedSkin = (raw: unknown): SkinId =>
   (isSkinId(raw) ? raw : 'attic')
+
+type FurnishingSlot = 'bed' | 'rug' | 'lighting' | 'storage' | 'wall' | 'window'
+type FurnishingId =
+  | 'cozy-bed' | 'cream-rug' | 'warm-lamp' | 'wood-shelf' | 'tiny-wall-art' | 'window-plant'
+  | 'retro-sofa' | 'checker-rug' | 'tripod-lamp' | 'blue-cabinet' | 'party-wall' | 'succulent-trio'
+
+type RoomFurnishing = {
+  id: FurnishingId
+  slot: FurnishingSlot
+  name: string
+  description: string
+  price: number
+  image: string
+}
+
+/** 빈 다락방 첫 번째 꾸미기 세트. 모든 PNG는 방 전체와 같은 캔버스라 좌표가 흔들리지 않습니다. */
+const roomFurnishings: RoomFurnishing[] = [
+  { id: 'cozy-bed', slot: 'bed', name: '살구빛 낮은 침대', description: '햇살 방 왼쪽에 맞춘 산뜻한 침대예요.', price: 120, image: '/assets/rooms/customizable/cozy-starter/bed.png' },
+  { id: 'cream-rug', slot: 'rug', name: '민트 물결 러그', description: '중앙 바닥을 가볍게 채워요.', price: 70, image: '/assets/rooms/customizable/cozy-starter/rug.png' },
+  { id: 'warm-lamp', slot: 'lighting', name: '하늘색 장스탠드', description: '창문 왼쪽에 산뜻하게 놓여요.', price: 90, image: '/assets/rooms/customizable/cozy-starter/lamp.png' },
+  { id: 'wood-shelf', slot: 'storage', name: '민트 자작 책장', description: '오른쪽 수납 자리에 놓여요.', price: 110, image: '/assets/rooms/customizable/cozy-starter/shelf.png' },
+  { id: 'tiny-wall-art', slot: 'wall', name: '햇살 벽 그림', description: '왼쪽 벽에 초록잎과 해를 걸어요.', price: 55, image: '/assets/rooms/customizable/cozy-starter/wall-art.png' },
+  { id: 'window-plant', slot: 'window', name: '파란 화분', description: '밝은 창가에 싱그럽게 놓여요.', price: 65, image: '/assets/rooms/customizable/cozy-starter/plant.png' },
+  { id: 'retro-sofa', slot: 'bed', name: '파란 소파베드', description: '침대 자리를 가벼운 소파로 바꿔요.', price: 145, image: '/assets/rooms/customizable/retro-set/sofa-bed.png' },
+  { id: 'checker-rug', slot: 'rug', name: '살구 체크 러그', description: '중앙 바닥에 산뜻한 체크를 깔아요.', price: 85, image: '/assets/rooms/customizable/retro-set/checker-rug.png' },
+  { id: 'tripod-lamp', slot: 'lighting', name: '코랄 삼각 스탠드', description: '왼쪽 조명 자리에 레트로하게 놓여요.', price: 105, image: '/assets/rooms/customizable/retro-set/tripod-lamp.png' },
+  { id: 'blue-cabinet', slot: 'storage', name: '파란 미닫이장', description: '오른쪽 수납 자리를 깔끔하게 채워요.', price: 130, image: '/assets/rooms/customizable/retro-set/cabinet.png' },
+  { id: 'party-wall', slot: 'wall', name: '시계와 작은 가랜드', description: '왼쪽 벽에 조금 더 장난스럽게 걸어요.', price: 75, image: '/assets/rooms/customizable/retro-set/wall-clock.png' },
+  { id: 'succulent-trio', slot: 'window', name: '다육이 삼총사', description: '창가에 조그만 화분 세 개를 놓아요.', price: 80, image: '/assets/rooms/customizable/retro-set/cactus.png' },
+]
+
+const isFurnishingId = (value: unknown): value is FurnishingId =>
+  typeof value === 'string' && roomFurnishings.some(item => item.id === value)
+
+const sanitizeFurnishingInventory = (raw: unknown): FurnishingId[] =>
+  Array.isArray(raw) ? [...new Set(raw.filter(isFurnishingId))] : []
+
+const sanitizeEquippedFurnishings = (raw: unknown): Partial<Record<FurnishingSlot, FurnishingId>> => {
+  if (!raw || typeof raw !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(raw).filter(([, value]) => isFurnishingId(value)),
+  ) as Partial<Record<FurnishingSlot, FurnishingId>>
+}
 
 /**
  * 캐릭터 코스튬 — 통짜 PNG 교체.
@@ -1049,6 +1093,8 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [inventory, setInventory] = useState<SkinId[]>(() => sanitizeSkinInventory(loadJson(k('inventory'), ['attic'])))
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => sanitizeEquippedSkin(loadJson(k('equipped-skin'), 'attic')))
   const [propInventory, setPropInventory] = useState<PropId[]>(() => sanitizePropList(loadJson(k('prop-inventory'), [])))
+  const [furnishingInventory, setFurnishingInventory] = useState<FurnishingId[]>(() => sanitizeFurnishingInventory(loadJson(k('furnishing-inventory'), [])))
+  const [equippedFurnishings, setEquippedFurnishings] = useState<Partial<Record<FurnishingSlot, FurnishingId>>>(() => sanitizeEquippedFurnishings(loadJson(k('equipped-furnishings'), {})))
   const [outfitInventory, setOutfitInventory] = useState<OutfitId[]>(() => loadJson(k('outfit-inventory'), ['none']))
   const [equippedOutfit, setEquippedOutfit] = useState<OutfitId>(() => loadJson(k('equipped-outfit'), 'none'))
   const [dailyTalks, setDailyTalks] = useState(() => loadJson(k(`talks-${period.todayKey}`), 0))
@@ -1303,6 +1349,9 @@ function PocketApp({ userHash }: { userHash: string }) {
   const roomImage = equippedSkin === 'attic'
     ? roomImages[snapshot.stage]
     : equippedRoom.stageImages?.[roomWearStage] ?? equippedRoom.image
+  const visibleFurnishings = equippedSkin === 'empty-attic'
+    ? roomFurnishings.filter(item => equippedFurnishings[item.slot] === item.id)
+    : []
   // 식비·예산·먹기 모션에 따라 상태 키를 고르고, 착용 옷의 같은 상태 PNG를 씁니다 (guide.md).
   const dogVisualState: DogVisualState = dogMotion === 'eat'
     ? 'eating'
@@ -1371,6 +1420,8 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('inventory'), inventory), [inventory, userHash])
   useEffect(() => saveJson(k('equipped-skin'), equippedSkin), [equippedSkin, userHash])
   useEffect(() => saveJson(k('prop-inventory'), propInventory), [propInventory, userHash])
+  useEffect(() => saveJson(k('furnishing-inventory'), furnishingInventory), [furnishingInventory, userHash])
+  useEffect(() => saveJson(k('equipped-furnishings'), equippedFurnishings), [equippedFurnishings, userHash])
   useEffect(() => saveJson(k('outfit-inventory'), outfitInventory), [outfitInventory, userHash])
   useEffect(() => saveJson(k('equipped-outfit'), equippedOutfit), [equippedOutfit, userHash])
   useEffect(() => saveJson(k('onboarding-done'), onboardingDone), [onboardingDone, userHash])
@@ -2093,6 +2144,30 @@ function PocketApp({ userHash }: { userHash: string }) {
         : `${prop.name} 추가 소품을 샀어요. 카페·배달·외식 기록을 남기면 방에 더 다양하게 쌓여요.`,
     )
   }
+  const useFurnishing = (item: RoomFurnishing) => {
+    const owned = furnishingInventory.includes(item.id)
+    const equipped = equippedFurnishings[item.slot] === item.id
+    if (equipped) {
+      setEquippedFurnishings(current => {
+        const next = { ...current }
+        delete next[item.slot]
+        return next
+      })
+      setMessage(`${item.name}을(를) 방에서 치웠어요.`)
+      return
+    }
+    if (!owned) {
+      if (points < item.price) {
+        setMessage(`${item.price - points}냠이 부족해요.`)
+        return
+      }
+      setPoints(current => current - item.price)
+      setFurnishingInventory(current => [...current, item.id])
+    }
+    setEquippedFurnishings(current => ({ ...current, [item.slot]: item.id }))
+    setEquippedSkin('empty-attic')
+    setMessage(owned ? `${item.name}을(를) 놓았어요.` : `${item.name}을(를) 구입하고 햇살 빈방에 놓았어요.`)
+  }
   const useOutfit = (outfit: typeof characterOutfits[number]) => {
     if (outfit.companionId !== null && outfit.companionId !== companionId) {
       setMessage('지금 선택한 눈찌가 입을 수 없는 코스튬이에요.')
@@ -2415,6 +2490,13 @@ function PocketApp({ userHash }: { userHash: string }) {
           aria-label={`${companionName}의 방`}
         >
           <img className="room-art room-breathe" src={roomImage} alt={`${equippedRoom.name}, 현재 ${status} 상태`} />
+          {visibleFurnishings.length > 0 && (
+            <div className="furnishing-layer" aria-hidden="true">
+              {visibleFurnishings.map(item => (
+                <img className={`room-furnishing furnishing-${item.slot}`} src={item.image} alt="" key={item.id} />
+              ))}
+            </div>
+          )}
           <div className="prop-layer" aria-hidden="true">
             {deliveryPiles.map((source, index) => (
               <img
@@ -3420,6 +3502,33 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : shopTab === 'props' ? (
             <>
+              <p className="shop-section-title"><b>햇살 빈방 꾸미기</b><span>구매하면 지정된 자리에 놓여요.</span></p>
+              <div className="skin-grid outfit-grid prop-grid furnishing-grid">
+                {roomFurnishings.map(item => {
+                  const owned = furnishingInventory.includes(item.id)
+                  const equipped = equippedFurnishings[item.slot] === item.id
+                  return (
+                    <article key={item.id} className={equipped ? 'equipped' : ''}>
+                      <img src={item.image} alt={item.name} />
+                      <div>
+                        <h3>{item.name}</h3>
+                        <p>{item.description}</p>
+                      </div>
+                      <Button
+                        className="skin-cta"
+                        display="block"
+                        size="small"
+                        color={equipped ? 'dark' : 'primary'}
+                        variant={equipped ? 'weak' : 'fill'}
+                        onClick={() => useFurnishing(item)}
+                      >
+                        {equipped ? '치우기' : owned ? '놓기' : <NyamAmount amount={item.price} />}
+                      </Button>
+                    </article>
+                  )
+                })}
+              </div>
+              <p className="shop-section-title"><b>소비 기록 소품</b><span>기록 횟수에 따라 자동으로 쌓여요.</span></p>
               <p className="shop-lock-hint">
                 배달 봉투·택배 상자는 기본으로 쌓여요.
                 추가 소품을 사면 기록할 때 <b>랜덤</b>으로 더 나와요.
