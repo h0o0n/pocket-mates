@@ -33,6 +33,8 @@ export interface FixedExpenseItem {
   id: string
   name: string
   amount: number
+  /** 매월 결제 예정일. 기존 저장 데이터와의 호환을 위해 선택값으로 둡니다. */
+  dueDay?: number
 }
 
 export interface Expense {

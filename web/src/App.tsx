@@ -33,7 +33,7 @@ const NyamAmount = ({ amount, suffix = '냠' }: { amount: number; suffix?: strin
 const defaultPlan: BudgetPlan = {
   monthlyIncome: 3_000_000,
   fixedExpenses: 1_000_000,
-  fixedExpenseItems: [{ id: 'default-fixed', name: '기타 고정비', amount: 1_000_000 }],
+  fixedExpenseItems: [{ id: 'default-fixed', name: '기타 고정비', amount: 1_000_000, dueDay: 1 }],
   savingsGoal: 500_000,
   cycleStartDay: 1,
 }
@@ -45,8 +45,9 @@ const normalizeBudgetPlan = (raw: Partial<BudgetPlan> | null | undefined): Budge
       id: String(item.id || `fixed-${index}`),
       name: String(item.name || '고정비').slice(0, 20),
       amount: Math.max(0, Number(item.amount) || 0),
+      dueDay: Math.min(31, Math.max(1, Math.trunc(Number(item.dueDay ?? 1)) || 1)),
     }))
-    : [{ id: 'legacy-fixed', name: '기존 고정비', amount: legacyFixed }]
+    : [{ id: 'legacy-fixed', name: '기존 고정비', amount: legacyFixed, dueDay: 1 }]
   return {
     monthlyIncome: Math.max(0, Number(raw?.monthlyIncome ?? defaultPlan.monthlyIncome)),
     fixedExpenses: items.reduce((sum, item) => sum + item.amount, 0),
@@ -67,6 +68,30 @@ const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }
   { value: 'pet', label: '반려동물', emoji: '🐾' },
   { value: 'other', label: '기타', emoji: '✏️' },
 ]
+
+const QUICK_EXPENSE_ICONS = ['☕', '🍚', '🍕', '🚌', '🛒', '📦', '🎮', '🐾', '💊', '✨'] as const
+type QuickExpensePreset = {
+  id: string
+  icon: string
+  name: string
+  amount: number
+  category: ExpenseCategory
+}
+const emptyQuickExpense = (): QuickExpensePreset => ({
+  id: '', icon: '☕', name: '', amount: 0, category: 'coffee',
+})
+const sanitizeQuickExpenses = (raw: unknown): QuickExpensePreset[] => {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((item): QuickExpensePreset[] => {
+    if (!item || typeof item !== 'object') return []
+    const value = item as Partial<QuickExpensePreset>
+    const category = categories.some(option => option.value === value.category) ? value.category! : 'other'
+    const amount = Math.max(0, Number(value.amount) || 0)
+    const name = String(value.name ?? '').trim().slice(0, 12)
+    if (!name || amount <= 0) return []
+    return [{ id: String(value.id || crypto.randomUUID()), icon: String(value.icon || '✨'), name, amount, category }]
+  }).slice(0, 5)
+}
 const copy = {
   relaxed: ['평화로워요', '이번 달은 아직 창밖을 볼 여유가 있어요.'],
   watching: ['슬슬 보는 중', '방금 그 결제, 꼭 필요했던 거 맞아요?'],
@@ -1004,11 +1029,17 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [plan, setPlan] = useState<BudgetPlan>(() => normalizeBudgetPlan(loadJson<Partial<BudgetPlan>>(k('plan'), defaultPlan)))
   const [draftPlan, setDraftPlan] = useState(plan)
   const [expenses, setExpenses] = useState<Expense[]>(() => loadJson(k('expenses'), []))
+  const [quickExpenses, setQuickExpenses] = useState<QuickExpensePreset[]>(() => sanitizeQuickExpenses(loadJson(k('quick-expenses'), [])))
+  const [quickEditorOpen, setQuickEditorOpen] = useState(false)
+  const [quickDraft, setQuickDraft] = useState<QuickExpensePreset>(() => emptyQuickExpense())
+  const [quickManageMode, setQuickManageMode] = useState(false)
+  const [fixedPayments, setFixedPayments] = useState<Record<string, string[]>>(() => loadJson(k('fixed-payments'), {}))
   const [category, setCategory] = useState<ExpenseCategory>('dining')
   const [memo, setMemo] = useState('')
   const [amount, setAmount] = useState('')
   // 소비 기록 날짜 (YYYY-MM-DD). 기본은 오늘, 캘린더/문자에서 바꿀 수 있음.
   const [expenseDate, setExpenseDate] = useState(() => dateKey(new Date()))
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const [smsPaste, setSmsPaste] = useState('')
   const [ocrDrafts, setOcrDrafts] = useState<OcrExpenseDraft[]>([])
   const [ocrBusy, setOcrBusy] = useState(false)
@@ -1185,6 +1216,18 @@ function PocketApp({ userHash }: { userHash: string }) {
     () => calculateMonthlyBudget(plan, currentMonthExpenses, todayKey),
     [plan, currentMonthExpenses, todayKey],
   )
+  const budgetCycle = useMemo(
+    () => getBudgetCycleRange(todayKey, plan.cycleStartDay),
+    [todayKey, plan.cycleStartDay],
+  )
+  const budgetCycleKey = dateKey(budgetCycle.start)
+  const remainingBudgetDays = Math.max(1, Math.ceil((budgetCycle.end.getTime() - parseDateKey(todayKey).getTime()) / 86_400_000))
+  const dailyAvailableAmount = Math.max(0, Math.floor((Math.max(0, snapshot.remainingBalance) / remainingBudgetDays) / 100) * 100)
+  const paidFixedExpenseIds = fixedPayments[budgetCycleKey] ?? []
+  const todayDayOfMonth = parseDateKey(todayKey).getDate()
+  const fixedExpensesDueToday = plan.fixedExpenseItems.filter(item =>
+    (item.dueDay ?? 1) === todayDayOfMonth && !paidFixedExpenseIds.includes(item.id),
+  )
   const foodExpenses = currentMonthExpenses
     .filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
     .sort((a, b) => a.spentAt.localeCompare(b.spentAt))
@@ -1328,6 +1371,8 @@ function PocketApp({ userHash }: { userHash: string }) {
 
   useEffect(() => saveJson(k('plan'), plan), [plan, userHash])
   useEffect(() => saveJson(k('expenses'), expenses), [expenses, userHash])
+  useEffect(() => saveJson(k('quick-expenses'), quickExpenses), [quickExpenses, userHash])
+  useEffect(() => saveJson(k('fixed-payments'), fixedPayments), [fixedPayments, userHash])
   useEffect(() => saveJson(k('points'), points), [points, userHash])
   useEffect(() => saveJson(k('inventory'), inventory), [inventory, userHash])
   useEffect(() => saveJson(k('equipped-skin'), equippedSkin), [equippedSkin, userHash])
@@ -1778,10 +1823,21 @@ function PocketApp({ userHash }: { userHash: string }) {
     setBudgetChecked(true)
     setMessage(`${normalized.cycleStartDay}일부터 시작하는 예산을 저장했어요.`)
   }
-  /** 소비 시트 열기. 날짜를 넘기면 그날로, 없으면 오늘로 맞춥니다. */
-  const openExpenseSheet = (preferredDate?: string) => {
-    setExpenseDate(preferredDate ?? dateKey(new Date()))
+  /** 소비 시트 열기. 기존 내역을 넘기면 같은 입력창에서 수정합니다. */
+  const openExpenseSheet = (preferredDate?: string, expense?: Expense) => {
+    setEditingExpenseId(expense?.id ?? null)
+    setCategory(expense?.category ?? 'dining')
+    setMemo(expense?.memo ?? '')
+    setAmount(expense ? String(expense.amount) : '')
+    setExpenseDate(expense ? dateKey(new Date(expense.spentAt)) : preferredDate ?? dateKey(new Date()))
+    setSmsPaste('')
+    setOcrDrafts([])
     setExpenseSheetOpen(true)
+  }
+
+  const closeExpenseSheet = () => {
+    setExpenseSheetOpen(false)
+    setEditingExpenseId(null)
   }
 
   const saveExpense = (event: FormEvent) => {
@@ -1793,22 +1849,31 @@ function PocketApp({ userHash }: { userHash: string }) {
     // 선택한 날짜 + 현재 시각으로 저장 (같은 날 여러 건 정렬용).
     const now = new Date()
     const [year, month, day] = expenseDate.split('-').map(Number)
-    const spentAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
-    const newExpense: Expense = {
-      id: crypto.randomUUID(),
+    const originalExpense = editingExpenseId ? expenses.find(item => item.id === editingExpenseId) : undefined
+    const originalTime = originalExpense ? new Date(originalExpense.spentAt) : now
+    const savedExpense: Expense = {
+      id: editingExpenseId ?? crypto.randomUUID(),
       category,
       amount: parsed,
       memo: memoText,
-      spentAt,
+      spentAt: new Date(year, month - 1, day, originalTime.getHours(), originalTime.getMinutes(), originalTime.getSeconds()).toISOString(),
+    }
+    if (editingExpenseId) {
+      setExpenses(list => list.map(item => item.id === editingExpenseId ? savedExpense : item))
+      setMemo('')
+      setAmount('')
+      closeExpenseSheet()
+      setMessage(`${memoText} 내역을 수정했어요.`)
+      return
     }
     // 카테고리·잔액 stage 기반 도메인 멘트를 말풍선/토스트에 연결
-    const reaction = createExpenseReaction(plan, expenses, newExpense)
-    setExpenses(list => [newExpense, ...list])
+    const reaction = createExpenseReaction(plan, expenses, savedExpense)
+    setExpenses(list => [savedExpense, ...list])
     setMemo('')
     setAmount('')
     setSmsPaste('')
     setExpenseDate(dateKey(new Date()))
-    setExpenseSheetOpen(false)
+    closeExpenseSheet()
 
     const isFood = category === 'coffee' || category === 'delivery' || category === 'dining'
     if (isFood) {
@@ -1828,6 +1893,56 @@ function PocketApp({ userHash }: { userHash: string }) {
     setBubbleVisible(true)
     setMessage(`${memoText} ${won(parsed)}원 · ${reaction.message}`)
   }
+
+  const recordQuickExpense = (preset: QuickExpensePreset) => {
+    const now = new Date()
+    const quickExpense: Expense = {
+      id: crypto.randomUUID(),
+      category: preset.category,
+      amount: preset.amount,
+      memo: preset.name,
+      spentAt: now.toISOString(),
+    }
+    const reaction = createExpenseReaction(plan, expenses, quickExpense)
+    setExpenses(list => [quickExpense, ...list])
+    const isFood = ['coffee', 'delivery', 'dining'].includes(preset.category)
+    if (isFood) playSnackBite(reaction.message)
+    else playDogMotion(preset.category === 'shopping' ? 'hop' : 'nod', 1000)
+    setDogLine(reaction.message)
+    setBubbleVisible(true)
+    setMessage(`${preset.icon} ${preset.name} ${won(preset.amount)}원을 바로 기록했어요.`)
+  }
+
+  const openQuickEditor = (preset?: QuickExpensePreset) => {
+    setQuickDraft(preset ? { ...preset } : emptyQuickExpense())
+    setQuickEditorOpen(true)
+  }
+
+  const saveQuickExpense = (event: FormEvent) => {
+    event.preventDefault()
+    const name = quickDraft.name.trim().slice(0, 12)
+    const preset = { ...quickDraft, id: quickDraft.id || crypto.randomUUID(), name, amount: Math.max(0, quickDraft.amount) }
+    if (!name) return setMessage('빠른 기록 이름을 입력해 주세요.')
+    if (preset.amount <= 0) return setMessage('빠른 기록 금액을 입력해 주세요.')
+    setQuickExpenses(current => quickDraft.id
+      ? current.map(item => item.id === quickDraft.id ? preset : item)
+      : [...current, preset].slice(0, 5))
+    setQuickEditorOpen(false)
+    setMessage(`${preset.icon} ${preset.name} 빠른 기록을 저장했어요.`)
+  }
+
+  const removeQuickExpense = (id: string) => {
+    setQuickExpenses(current => current.filter(item => item.id !== id))
+    setQuickEditorOpen(false)
+  }
+
+  const toggleFixedExpensePaid = (id: string) => setFixedPayments(current => {
+    const paid = current[budgetCycleKey] ?? []
+    return {
+      ...current,
+      [budgetCycleKey]: paid.includes(id) ? paid.filter(itemId => itemId !== id) : [...paid, id],
+    }
+  })
   const applySmsPaste = () => {
     const parsed = parsePaymentSms(smsPaste)
     if (!parsed) {
@@ -1906,11 +2021,18 @@ function PocketApp({ userHash }: { userHash: string }) {
   }))
   const addFixedExpenseItem = () => setFixedExpenseItems([
     ...draftPlan.fixedExpenseItems,
-    { id: crypto.randomUUID(), name: '', amount: 0 },
+    { id: crypto.randomUUID(), name: '', amount: 0, dueDay: 1 },
   ])
-  const updateFixedExpenseItem = (id: string, key: 'name' | 'amount', value: string) => {
+  const updateFixedExpenseItem = (id: string, key: 'name' | 'amount' | 'dueDay', value: string) => {
     setFixedExpenseItems(draftPlan.fixedExpenseItems.map(item => item.id === id
-      ? { ...item, [key]: key === 'amount' ? numberFromInput(value) : value.slice(0, 20) }
+      ? {
+        ...item,
+        [key]: key === 'amount'
+          ? numberFromInput(value)
+          : key === 'dueDay'
+            ? Math.min(31, Math.max(1, numberFromInput(value) || 1))
+            : value.slice(0, 20),
+      }
       : item))
   }
   const removeFixedExpenseItem = (id: string) => setFixedExpenseItems(
@@ -2579,10 +2701,67 @@ function PocketApp({ userHash }: { userHash: string }) {
         <p className="status-line">
           {status} · {Math.max(0, Math.round(snapshot.remainingRatio * 100))}% 남음 · 사용 {won(snapshot.totalSpent)}원
         </p>
+        <div className="daily-available">
+          <span>오늘부터 하루 평균</span>
+          <b>{won(dailyAvailableAmount)}원</b>
+          <small>예산 종료까지 {remainingBudgetDays}일</small>
+        </div>
       </section>
 
       {activePanel === 'expense' && (
         <section className="panel-card">
+          <div className="quick-expense-head">
+            <div><b>빠른 기록</b><small>자주 쓰는 금액을 한 번에 기록해요.</small></div>
+            <button type="button" onClick={() => setQuickManageMode(value => !value)}>{quickManageMode ? '완료' : '편집'}</button>
+          </div>
+          <div className="quick-expense-grid">
+            {quickExpenses.map(preset => (
+              <button
+                type="button"
+                className={quickManageMode ? 'is-managing' : ''}
+                key={preset.id}
+                onClick={() => quickManageMode ? openQuickEditor(preset) : recordQuickExpense(preset)}
+              >
+                <span>{preset.icon}</span>
+                <b>{preset.name}</b>
+                <small>{won(preset.amount)}원</small>
+                {quickManageMode && <i>수정</i>}
+              </button>
+            ))}
+            {quickExpenses.length < 5 && (
+              <button type="button" className="quick-expense-add" onClick={() => openQuickEditor()}>
+                <span>＋</span><b>추가</b><small>직접 설정</small>
+              </button>
+            )}
+          </div>
+          {quickEditorOpen && (
+            <form className="quick-expense-editor" onSubmit={saveQuickExpense}>
+              <div className="quick-icon-picker" aria-label="빠른 기록 아이콘 선택">
+                {QUICK_EXPENSE_ICONS.map(icon => (
+                  <button type="button" className={quickDraft.icon === icon ? 'active' : ''} onClick={() => setQuickDraft(current => ({ ...current, icon }))} key={icon}>{icon}</button>
+                ))}
+              </div>
+              <div className="quick-expense-fields">
+                <input value={quickDraft.name} maxLength={12} placeholder="이름 (예: 회사 점심)" onChange={event => setQuickDraft(current => ({ ...current, name: event.target.value }))} />
+                <label><input inputMode="numeric" value={quickDraft.amount ? formattedInput(quickDraft.amount) : ''} placeholder="금액" onChange={event => setQuickDraft(current => ({ ...current, amount: numberFromInput(event.target.value) }))} /><span>원</span></label>
+                <select value={quickDraft.category} onChange={event => setQuickDraft(current => ({ ...current, category: event.target.value as ExpenseCategory }))}>
+                  {categories.map(info => <option value={info.value} key={info.value}>{info.emoji} {info.label}</option>)}
+                </select>
+              </div>
+              <div className="quick-expense-editor-actions">
+                {quickDraft.id && <button type="button" className="danger" onClick={() => removeQuickExpense(quickDraft.id)}>삭제</button>}
+                <button type="button" onClick={() => setQuickEditorOpen(false)}>취소</button>
+                <button type="submit" className="primary">저장</button>
+              </div>
+            </form>
+          )}
+          {fixedExpensesDueToday.length > 0 && (
+            <div className="fixed-due-today">
+              <span>오늘 결제 예정</span>
+              <b>{fixedExpensesDueToday.map(item => item.name).join(', ')}</b>
+              <small>{won(fixedExpensesDueToday.reduce((sum, item) => sum + item.amount, 0))}원 · 예산에서 이미 제외됨</small>
+            </div>
+          )}
           <ListHeader title={<ListHeader.TitleParagraph>미션</ListHeader.TitleParagraph>} />
           <div className="panel-body mission-panels">
             <div className="mission-box">
@@ -2657,6 +2836,21 @@ function PocketApp({ userHash }: { userHash: string }) {
             verticalPadding="small"
             border="none"
           />
+          {plan.fixedExpenseItems.length > 0 && (
+            <section className="fixed-payment-status">
+              <div className="fixed-payment-title"><b>이번 고정비</b><small>납부 확인은 생활예산을 다시 차감하지 않아요.</small></div>
+              {plan.fixedExpenseItems.map(item => {
+                const paid = paidFixedExpenseIds.includes(item.id)
+                return (
+                  <button type="button" className={paid ? 'is-paid' : ''} onClick={() => toggleFixedExpensePaid(item.id)} key={item.id}>
+                    <span>{paid ? '✓' : item.dueDay ?? 1}</span>
+                    <div><b>{item.name}</b><small>매월 {item.dueDay ?? 1}일 · {won(item.amount)}원</small></div>
+                    <strong>{paid ? '납부 완료' : '확인하기'}</strong>
+                  </button>
+                )
+              })}
+            </section>
+          )}
           <ListHeader title={<ListHeader.TitleParagraph>예산 설정</ListHeader.TitleParagraph>} />
           <form className="panel-body" onSubmit={savePlan}>
             <label className="budget-cycle-field">
@@ -2694,6 +2888,10 @@ function PocketApp({ userHash }: { userHash: string }) {
                   <label>
                     <input aria-label={`${item.name || `고정비 ${index + 1}`} 금액`} inputMode="numeric" value={formattedInput(item.amount)} placeholder="0" onChange={event => updateFixedExpenseItem(item.id, 'amount', event.target.value)} />
                     <span>원</span>
+                  </label>
+                  <label className="fixed-expense-day">
+                    <input aria-label={`${item.name || `고정비 ${index + 1}`} 결제일`} inputMode="numeric" value={item.dueDay ?? 1} onChange={event => updateFixedExpenseItem(item.id, 'dueDay', event.target.value)} />
+                    <span>일</span>
                   </label>
                   <button type="button" aria-label={`${item.name || `고정비 ${index + 1}`} 삭제`} onClick={() => removeFixedExpenseItem(item.id)}>×</button>
                 </div>
@@ -2992,13 +3190,10 @@ function PocketApp({ userHash }: { userHash: string }) {
                           <small>{info.label}</small>
                         </div>
                         <strong>-{won(expense.amount)}원</strong>
-                        <button
-                          aria-label={`${expense.memo} 삭제`}
-                          type="button"
-                          onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
-                        >
-                          ×
-                        </button>
+                        <span className="expense-actions">
+                          <button aria-label={`${expense.memo} 수정`} type="button" onClick={() => openExpenseSheet(undefined, expense)}>✎</button>
+                          <button aria-label={`${expense.memo} 삭제`} type="button" onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button>
+                        </span>
                       </li>
                     )
                   })}
@@ -3093,13 +3288,10 @@ function PocketApp({ userHash }: { userHash: string }) {
                                 <small>{info.label}</small>
                               </div>
                               <strong>-{won(expense.amount)}원</strong>
-                              <button
-                                aria-label={`${expense.memo} 삭제`}
-                                type="button"
-                                onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}
-                              >
-                                ×
-                              </button>
+                              <span className="expense-actions">
+                                <button aria-label={`${expense.memo} 수정`} type="button" onClick={() => openExpenseSheet(undefined, expense)}>✎</button>
+                                <button aria-label={`${expense.memo} 삭제`} type="button" onClick={() => setExpenses(list => list.filter(x => x.id !== expense.id))}>×</button>
+                              </span>
                             </li>
                           )
                         }),
@@ -3490,10 +3682,10 @@ function PocketApp({ userHash }: { userHash: string }) {
 
       <BottomSheet
         open={expenseSheetOpen}
-        onClose={() => setExpenseSheetOpen(false)}
-        onDimmerClick={() => setExpenseSheetOpen(false)}
+        onClose={closeExpenseSheet}
+        onDimmerClick={closeExpenseSheet}
         hasTextField
-        header={<BottomSheet.Header>소비 기록</BottomSheet.Header>}
+        header={<BottomSheet.Header>{editingExpenseId ? '소비 내역 수정' : '소비 기록'}</BottomSheet.Header>}
         cta={
           <BottomSheet.CTA
             color="primary"
@@ -3502,13 +3694,13 @@ function PocketApp({ userHash }: { userHash: string }) {
               form?.requestSubmit()
             }}
           >
-            기록하기
+            {editingExpenseId ? '수정하기' : '기록하기'}
           </BottomSheet.CTA>
         }
       >
         <div className="expense-sheet-frame">
           <form id="expense-sheet-form" className="expense-sheet-form" onSubmit={saveExpense}>
-            <section className="expense-section payment-capture-section" aria-label="결제내역 캡처 등록">
+            {!editingExpenseId && <section className="expense-section payment-capture-section" aria-label="결제내역 캡처 등록">
               <div className="payment-capture-heading">
                 <div><p className="expense-section-label">결제내역 캡처</p><small>이미지는 기기에서만 읽고 저장하지 않아요.</small></div>
                 <label className={`payment-capture-button ${ocrBusy ? 'is-disabled' : ''}`}>
@@ -3538,10 +3730,10 @@ function PocketApp({ userHash }: { userHash: string }) {
                   <button type="button" className="ocr-save-all" onClick={saveOcrDrafts}>선택한 {ocrDrafts.filter(item => item.selected).length}건 기록하기</button>
                 </div>
               )}
-            </section>
+            </section>}
 
             {/* 0. 결제 문자 붙여넣기 → 금액/메모 자동 채움 */}
-            <section className="expense-section" aria-label="결제 문자 붙여넣기">
+            {!editingExpenseId && <section className="expense-section" aria-label="결제 문자 붙여넣기">
               <p className="expense-section-label">결제 문자 붙여넣기</p>
               <textarea
                 className="sms-paste"
@@ -3558,7 +3750,7 @@ function PocketApp({ userHash }: { userHash: string }) {
               >
                 불러오기
               </button>
-            </section>
+            </section>}
 
             {/* 1. 날짜 — 오늘/어제 뱃지 + 달력 선택 */}
             <section className="expense-section" aria-label="소비 날짜">
