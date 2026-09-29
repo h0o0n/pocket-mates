@@ -448,7 +448,15 @@ body.is-expense-sheet-open .app-shell {
 .quick-expense-head > button { border: 0; background: transparent; color: var(--pm-blue); font-size: 12px; font-weight: 800; }
 .quick-expense-grid { display: grid; grid-template-columns: repeat(5, minmax(62px, 1fr)); gap: 7px; overflow-x: auto; padding: 0 14px 12px; }
 .quick-expense-grid > button { position: relative; display: grid; min-width: 62px; min-height: 82px; place-items: center; align-content: center; gap: 3px; padding: 8px 4px; border: 1px solid var(--pm-line); border-radius: 15px; background: #f9fafb; color: var(--pm-text); }
-.quick-expense-grid > button > span { font-size: 22px; line-height: 1; }
+.quick-expense-grid > button > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 22px;
+  line-height: 1;
+}
 .quick-expense-grid > button > b { max-width: 100%; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .quick-expense-grid > button > small { color: var(--pm-text-sub); font-size: 9px; white-space: nowrap; }
 .quick-expense-grid > button > i { position: absolute; top: 4px; right: 5px; color: var(--pm-blue); font-size: 8px; font-style: normal; }
@@ -456,7 +464,7 @@ body.is-expense-sheet-open .app-shell {
 .quick-expense-grid > button.quick-expense-add { border-style: dashed; color: var(--pm-text-sub); }
 .quick-expense-editor { display: grid; gap: 10px; margin: 0 14px 13px; padding: 13px; border: 1px solid var(--pm-tint-line); border-radius: 16px; background: var(--pm-tint); }
 .quick-icon-picker { display: flex; gap: 5px; overflow-x: auto; }
-.quick-icon-picker button { flex: 0 0 34px; width: 34px; height: 34px; border: 1px solid var(--pm-line); border-radius: 10px; background: #fff; font-size: 18px; }
+.quick-icon-picker button { display: grid; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; place-items: center; border: 1px solid var(--pm-line); border-radius: 10px; background: #fff; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 18px; line-height: 1; }
 .quick-icon-picker button.active { border: 2px solid var(--pm-blue); }
 .quick-expense-fields { display: grid; grid-template-columns: 1fr 112px; gap: 7px; }
 .quick-expense-fields > input, .quick-expense-fields > label, .quick-expense-fields > select { min-width: 0; min-height: 40px; border: 1px solid var(--pm-line); border-radius: 10px; background: #fff; color: var(--pm-text); font: inherit; font-size: 12px; box-sizing: border-box; }
