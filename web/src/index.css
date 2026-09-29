@@ -172,6 +172,7 @@ body.is-expense-sheet-open .app-shell {
   backdrop-filter: blur(8px);
 }
 .hero-settings-button.active { border-color: var(--pm-blue); background: var(--pm-tint); color: var(--pm-blue); }
+.hero-settings-button svg { display: block; }
 .room-view-switch {
   position: relative;
   z-index: 20;

@@ -2411,8 +2411,9 @@ function PocketApp({ userHash }: { userHash: string }) {
           aria-label={activePanel === 'settings' ? '설정 닫기' : '설정 열기'}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M16.2 11.2v-2.4l-1.8-.5a5.2 5.2 0 0 0-.6-1.3l.9-1.6L13 3.8l-1.6.9a5.2 5.2 0 0 0-1.4-.6L9.6 2.3H7.2l-.5 1.8a5.2 5.2 0 0 0-1.3.6l-1.6-.9-1.7 1.7L3 7a5.2 5.2 0 0 0-.6 1.4l-1.8.4v2.4l1.8.5c.1.5.3.9.6 1.3l-.9 1.6 1.7 1.7 1.6-.9c.4.3.8.5 1.3.6l.5 1.8h2.4l.5-1.8c.5-.1.9-.3 1.3-.6l1.6.9 1.7-1.7-.9-1.6c.3-.4.5-.8.6-1.3l1.8-.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="10" cy="10" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+            <circle cx="10" cy="10" r="2.25" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3M4 4l2.1 2.1M13.9 13.9 16 16M16 4l-2.1 2.1M6.1 13.9 4 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
         <div className="room-view-switch" role="tablist" aria-label="방 전환">
