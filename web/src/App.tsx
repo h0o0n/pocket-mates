@@ -1031,7 +1031,6 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [quickEditorOpen, setQuickEditorOpen] = useState(false)
   const [quickDraft, setQuickDraft] = useState<QuickExpensePreset>(() => emptyQuickExpense())
   const [quickManageMode, setQuickManageMode] = useState(false)
-  const [fixedPayments, setFixedPayments] = useState<Record<string, string[]>>(() => loadJson(k('fixed-payments'), {}))
   const [category, setCategory] = useState<ExpenseCategory>('dining')
   const [memo, setMemo] = useState('')
   const [amount, setAmount] = useState('')
@@ -1218,13 +1217,11 @@ function PocketApp({ userHash }: { userHash: string }) {
     () => getBudgetCycleRange(todayKey, plan.cycleStartDay),
     [todayKey, plan.cycleStartDay],
   )
-  const budgetCycleKey = dateKey(budgetCycle.start)
   const remainingBudgetDays = Math.max(1, Math.ceil((budgetCycle.end.getTime() - parseDateKey(todayKey).getTime()) / 86_400_000))
   const dailyAvailableAmount = Math.max(0, Math.floor((Math.max(0, snapshot.remainingBalance) / remainingBudgetDays) / 100) * 100)
-  const paidFixedExpenseIds = fixedPayments[budgetCycleKey] ?? []
   const todayDayOfMonth = parseDateKey(todayKey).getDate()
   const fixedExpensesDueToday = plan.fixedExpenseItems.filter(item =>
-    (item.dueDay ?? 1) === todayDayOfMonth && !paidFixedExpenseIds.includes(item.id),
+    (item.dueDay ?? 1) === todayDayOfMonth,
   )
   const foodExpenses = currentMonthExpenses
     .filter(x => ['coffee', 'delivery', 'dining'].includes(x.category))
@@ -1370,7 +1367,6 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('plan'), plan), [plan, userHash])
   useEffect(() => saveJson(k('expenses'), expenses), [expenses, userHash])
   useEffect(() => saveJson(k('quick-expenses'), quickExpenses), [quickExpenses, userHash])
-  useEffect(() => saveJson(k('fixed-payments'), fixedPayments), [fixedPayments, userHash])
   useEffect(() => saveJson(k('points'), points), [points, userHash])
   useEffect(() => saveJson(k('inventory'), inventory), [inventory, userHash])
   useEffect(() => saveJson(k('equipped-skin'), equippedSkin), [equippedSkin, userHash])
@@ -1934,13 +1930,6 @@ function PocketApp({ userHash }: { userHash: string }) {
     setQuickEditorOpen(false)
   }
 
-  const toggleFixedExpensePaid = (id: string) => setFixedPayments(current => {
-    const paid = current[budgetCycleKey] ?? []
-    return {
-      ...current,
-      [budgetCycleKey]: paid.includes(id) ? paid.filter(itemId => itemId !== id) : [...paid, id],
-    }
-  })
   const applySmsPaste = () => {
     const parsed = parsePaymentSms(smsPaste)
     if (!parsed) {
@@ -2831,17 +2820,13 @@ function PocketApp({ userHash }: { userHash: string }) {
           />
           {plan.fixedExpenseItems.length > 0 && (
             <section className="fixed-payment-status">
-              <div className="fixed-payment-title"><b>이번 고정비</b><small>납부 확인은 생활예산을 다시 차감하지 않아요.</small></div>
-              {plan.fixedExpenseItems.map(item => {
-                const paid = paidFixedExpenseIds.includes(item.id)
-                return (
-                  <button type="button" className={paid ? 'is-paid' : ''} onClick={() => toggleFixedExpensePaid(item.id)} key={item.id}>
-                    <span>{paid ? '✓' : item.dueDay ?? 1}</span>
+              <div className="fixed-payment-title"><b>고정비 일정</b><small>생활예산에서 이미 제외된 금액이에요.</small></div>
+              {plan.fixedExpenseItems.map(item => (
+                  <article key={item.id}>
+                    <span>{item.dueDay ?? 1}</span>
                     <div><b>{item.name}</b><small>매월 {item.dueDay ?? 1}일 · {won(item.amount)}원</small></div>
-                    <strong>{paid ? '납부 완료' : '확인하기'}</strong>
-                  </button>
-                )
-              })}
+                  </article>
+              ))}
             </section>
           )}
           <ListHeader title={<ListHeader.TitleParagraph>예산 설정</ListHeader.TitleParagraph>} />

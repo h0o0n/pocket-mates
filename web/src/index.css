@@ -380,13 +380,10 @@ body.is-expense-sheet-open .app-shell {
 .fixed-payment-title { display: grid; gap: 2px; margin-bottom: 3px; }
 .fixed-payment-title b { font-size: 13px; }
 .fixed-payment-title small { color: var(--pm-text-sub); font-size: 10px; }
-.fixed-payment-status > button { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 9px; width: 100%; padding: 9px; border: 0; border-radius: 12px; background: #fff; color: var(--pm-text); text-align: left; }
-.fixed-payment-status > button > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--pm-tint); color: var(--pm-blue); font-size: 12px; font-weight: 800; }
-.fixed-payment-status > button > div { display: grid; gap: 2px; }
-.fixed-payment-status > button small { color: var(--pm-text-sub); font-size: 10px; }
-.fixed-payment-status > button strong { color: var(--pm-blue); font-size: 10px; }
-.fixed-payment-status > button.is-paid { opacity: .6; }
-.fixed-payment-status > button.is-paid > div b { text-decoration: line-through; }
+.fixed-payment-status > article { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 9px; width: 100%; padding: 9px; border-radius: 12px; background: #fff; color: var(--pm-text); box-sizing: border-box; }
+.fixed-payment-status > article > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--pm-tint); color: var(--pm-blue); font-size: 12px; font-weight: 800; }
+.fixed-payment-status > article > div { display: grid; gap: 2px; }
+.fixed-payment-status > article small { color: var(--pm-text-sub); font-size: 10px; }
 
 .field-stack {
   display: grid;
