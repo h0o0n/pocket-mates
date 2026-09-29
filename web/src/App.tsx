@@ -69,16 +69,14 @@ const categories: Array<{ value: ExpenseCategory; label: string; emoji: string }
   { value: 'other', label: '기타', emoji: '✏️' },
 ]
 
-const QUICK_EXPENSE_ICONS = ['☕', '🍚', '🍕', '🚌', '🛒', '📦', '🎮', '🐾', '💊', '✨'] as const
 type QuickExpensePreset = {
   id: string
-  icon: string
   name: string
   amount: number
   category: ExpenseCategory
 }
 const emptyQuickExpense = (): QuickExpensePreset => ({
-  id: '', icon: '☕', name: '', amount: 0, category: 'coffee',
+  id: '', name: '', amount: 0, category: 'coffee',
 })
 const sanitizeQuickExpenses = (raw: unknown): QuickExpensePreset[] => {
   if (!Array.isArray(raw)) return []
@@ -89,7 +87,7 @@ const sanitizeQuickExpenses = (raw: unknown): QuickExpensePreset[] => {
     const amount = Math.max(0, Number(value.amount) || 0)
     const name = String(value.name ?? '').trim().slice(0, 12)
     if (!name || amount <= 0) return []
-    return [{ id: String(value.id || crypto.randomUUID()), icon: String(value.icon || '✨'), name, amount, category }]
+    return [{ id: String(value.id || crypto.randomUUID()), name, amount, category }]
   }).slice(0, 5)
 }
 const copy = {
@@ -1910,7 +1908,7 @@ function PocketApp({ userHash }: { userHash: string }) {
     else playDogMotion(preset.category === 'shopping' ? 'hop' : 'nod', 1000)
     setDogLine(reaction.message)
     setBubbleVisible(true)
-    setMessage(`${preset.icon} ${preset.name} ${won(preset.amount)}원을 바로 기록했어요.`)
+    setMessage(`${categoryInfo(preset.category).emoji} ${preset.name} ${won(preset.amount)}원을 바로 기록했어요.`)
   }
 
   const openQuickEditor = (preset?: QuickExpensePreset) => {
@@ -1928,7 +1926,7 @@ function PocketApp({ userHash }: { userHash: string }) {
       ? current.map(item => item.id === quickDraft.id ? preset : item)
       : [...current, preset].slice(0, 5))
     setQuickEditorOpen(false)
-    setMessage(`${preset.icon} ${preset.name} 빠른 기록을 저장했어요.`)
+    setMessage(`${categoryInfo(preset.category).emoji} ${preset.name} 빠른 기록을 저장했어요.`)
   }
 
   const removeQuickExpense = (id: string) => {
@@ -2722,7 +2720,7 @@ function PocketApp({ userHash }: { userHash: string }) {
                 key={preset.id}
                 onClick={() => quickManageMode ? openQuickEditor(preset) : recordQuickExpense(preset)}
               >
-                <span>{preset.icon}</span>
+                <span>{categoryInfo(preset.category).emoji}</span>
                 <b>{preset.name}</b>
                 <small>{won(preset.amount)}원</small>
                 {quickManageMode && <i>수정</i>}
@@ -2736,11 +2734,6 @@ function PocketApp({ userHash }: { userHash: string }) {
           </div>
           {quickEditorOpen && (
             <form className="quick-expense-editor" onSubmit={saveQuickExpense}>
-              <div className="quick-icon-picker" aria-label="빠른 기록 아이콘 선택">
-                {QUICK_EXPENSE_ICONS.map(icon => (
-                  <button type="button" className={quickDraft.icon === icon ? 'active' : ''} onClick={() => setQuickDraft(current => ({ ...current, icon }))} key={icon}>{icon}</button>
-                ))}
-              </div>
               <div className="quick-expense-fields">
                 <input value={quickDraft.name} maxLength={12} placeholder="이름 (예: 회사 점심)" onChange={event => setQuickDraft(current => ({ ...current, name: event.target.value }))} />
                 <label><input inputMode="numeric" value={quickDraft.amount ? formattedInput(quickDraft.amount) : ''} placeholder="금액" onChange={event => setQuickDraft(current => ({ ...current, amount: numberFromInput(event.target.value) }))} /><span>원</span></label>

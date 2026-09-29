@@ -463,9 +463,6 @@ body.is-expense-sheet-open .app-shell {
 .quick-expense-grid > button.is-managing { border-color: var(--pm-blue); background: var(--pm-tint); }
 .quick-expense-grid > button.quick-expense-add { border-style: dashed; color: var(--pm-text-sub); }
 .quick-expense-editor { display: grid; gap: 10px; margin: 0 14px 13px; padding: 13px; border: 1px solid var(--pm-tint-line); border-radius: 16px; background: var(--pm-tint); }
-.quick-icon-picker { display: flex; gap: 5px; overflow-x: auto; }
-.quick-icon-picker button { display: grid; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; place-items: center; border: 1px solid var(--pm-line); border-radius: 10px; background: #fff; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 18px; line-height: 1; }
-.quick-icon-picker button.active { border: 2px solid var(--pm-blue); }
 .quick-expense-fields { display: grid; grid-template-columns: 1fr 112px; gap: 7px; }
 .quick-expense-fields > input, .quick-expense-fields > label, .quick-expense-fields > select { min-width: 0; min-height: 40px; border: 1px solid var(--pm-line); border-radius: 10px; background: #fff; color: var(--pm-text); font: inherit; font-size: 12px; box-sizing: border-box; }
 .quick-expense-fields > input, .quick-expense-fields > select { padding: 0 10px; }
