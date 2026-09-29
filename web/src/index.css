@@ -923,6 +923,83 @@ body.is-expense-sheet-open .app-shell {
   font-size: 11px;
   text-align: right;
 }
+.furnishing-showcase {
+  overflow: hidden;
+  margin: 0 16px 16px;
+  border: 1.5px solid rgba(54, 77, 83, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #eff8f3, #fff8ec);
+  box-shadow: 0 8px 24px rgba(31, 55, 62, 0.09);
+}
+.furnishing-showcase-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  background: #eaf3ed;
+}
+.furnishing-showcase-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.furnishing-showcase-preview .showcase-room { z-index: 0; object-fit: cover; }
+.furnishing-showcase-preview .showcase-rug { z-index: 1; }
+.furnishing-showcase-preview .showcase-bed,
+.furnishing-showcase-preview .showcase-lighting,
+.furnishing-showcase-preview .showcase-storage,
+.furnishing-showcase-preview .showcase-wall { z-index: 2; }
+.furnishing-showcase-preview .showcase-window { z-index: 3; }
+.furnishing-showcase-copy {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+}
+.furnishing-showcase-copy small {
+  color: #9b6a3d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.furnishing-showcase-copy h3 {
+  margin: 3px 0 0;
+  color: #263f44;
+  font-size: 17px;
+}
+.furnishing-showcase-copy p {
+  margin: 5px 0 0;
+  color: var(--pm-text-sub);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.backdrop-switch {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.backdrop-switch button {
+  padding: 6px 9px;
+  border: 1px solid rgba(54, 77, 83, 0.16);
+  border-radius: 999px;
+  background: rgba(255,255,255,.74);
+  color: var(--pm-text-sub);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+.backdrop-switch button.active {
+  border-color: #6d718e;
+  background: #4b526d;
+  color: #fff;
+}
+.backdrop-switch button:disabled {
+  opacity: .42;
+}
+.furnishing-showcase-copy > button { min-width: 112px; }
 .shop-lock-hint b {
   color: var(--pm-text);
   font-weight: 700;

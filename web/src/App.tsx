@@ -433,13 +433,16 @@ const sanitizeEquippedSkin = (raw: unknown): SkinId =>
   (isSkinId(raw) ? raw : 'attic')
 
 type FurnishingSlot = 'bed' | 'rug' | 'lighting' | 'storage' | 'wall' | 'window'
+type CustomRoomBackdrop = 'sunny' | 'lofi'
 type FurnishingId =
   | 'cozy-bed' | 'cream-rug' | 'warm-lamp' | 'wood-shelf' | 'tiny-wall-art' | 'window-plant'
   | 'retro-sofa' | 'checker-rug' | 'tripod-lamp' | 'blue-cabinet' | 'party-wall' | 'succulent-trio'
+  | 'lofi-sofa' | 'constellation-rug' | 'sunset-projector' | 'gaming-console' | 'controller-light' | 'speaker-dock'
 
 type RoomFurnishing = {
   id: FurnishingId
   slot: FurnishingSlot
+  backdrop: CustomRoomBackdrop
   name: string
   description: string
   price: number
@@ -448,18 +451,28 @@ type RoomFurnishing = {
 
 /** 빈 다락방 첫 번째 꾸미기 세트. 모든 PNG는 방 전체와 같은 캔버스라 좌표가 흔들리지 않습니다. */
 const roomFurnishings: RoomFurnishing[] = [
-  { id: 'cozy-bed', slot: 'bed', name: '살구빛 낮은 침대', description: '햇살 방 왼쪽에 맞춘 산뜻한 침대예요.', price: 120, image: '/assets/rooms/customizable/cozy-starter/bed.png' },
-  { id: 'cream-rug', slot: 'rug', name: '민트 물결 러그', description: '중앙 바닥을 가볍게 채워요.', price: 70, image: '/assets/rooms/customizable/cozy-starter/rug.png' },
-  { id: 'warm-lamp', slot: 'lighting', name: '하늘색 장스탠드', description: '창문 왼쪽에 산뜻하게 놓여요.', price: 90, image: '/assets/rooms/customizable/cozy-starter/lamp.png' },
-  { id: 'wood-shelf', slot: 'storage', name: '민트 자작 책장', description: '오른쪽 수납 자리에 놓여요.', price: 110, image: '/assets/rooms/customizable/cozy-starter/shelf.png' },
-  { id: 'tiny-wall-art', slot: 'wall', name: '햇살 벽 그림', description: '왼쪽 벽에 초록잎과 해를 걸어요.', price: 55, image: '/assets/rooms/customizable/cozy-starter/wall-art.png' },
-  { id: 'window-plant', slot: 'window', name: '파란 화분', description: '밝은 창가에 싱그럽게 놓여요.', price: 65, image: '/assets/rooms/customizable/cozy-starter/plant.png' },
-  { id: 'retro-sofa', slot: 'bed', name: '파란 소파베드', description: '침대 자리를 가벼운 소파로 바꿔요.', price: 145, image: '/assets/rooms/customizable/retro-set/sofa-bed.png' },
-  { id: 'checker-rug', slot: 'rug', name: '살구 체크 러그', description: '중앙 바닥에 산뜻한 체크를 깔아요.', price: 85, image: '/assets/rooms/customizable/retro-set/checker-rug.png' },
-  { id: 'tripod-lamp', slot: 'lighting', name: '코랄 삼각 스탠드', description: '왼쪽 조명 자리에 레트로하게 놓여요.', price: 105, image: '/assets/rooms/customizable/retro-set/tripod-lamp.png' },
-  { id: 'blue-cabinet', slot: 'storage', name: '파란 미닫이장', description: '오른쪽 수납 자리를 깔끔하게 채워요.', price: 130, image: '/assets/rooms/customizable/retro-set/cabinet.png' },
-  { id: 'party-wall', slot: 'wall', name: '시계와 작은 가랜드', description: '왼쪽 벽에 조금 더 장난스럽게 걸어요.', price: 75, image: '/assets/rooms/customizable/retro-set/wall-clock.png' },
-  { id: 'succulent-trio', slot: 'window', name: '다육이 삼총사', description: '창가에 조그만 화분 세 개를 놓아요.', price: 80, image: '/assets/rooms/customizable/retro-set/cactus.png' },
+  { id: 'cozy-bed', slot: 'bed', backdrop: 'sunny', name: '살구빛 낮은 침대', description: '햇살 방 왼쪽에 맞춘 산뜻한 침대예요.', price: 120, image: '/assets/rooms/customizable/cozy-starter/bed.png' },
+  { id: 'cream-rug', slot: 'rug', backdrop: 'sunny', name: '민트 물결 러그', description: '중앙 바닥을 가볍게 채워요.', price: 70, image: '/assets/rooms/customizable/cozy-starter/rug.png' },
+  { id: 'warm-lamp', slot: 'lighting', backdrop: 'sunny', name: '하늘색 장스탠드', description: '창문 왼쪽에 산뜻하게 놓여요.', price: 90, image: '/assets/rooms/customizable/cozy-starter/lamp.png' },
+  { id: 'wood-shelf', slot: 'storage', backdrop: 'sunny', name: '민트 자작 책장', description: '오른쪽 수납 자리에 놓여요.', price: 110, image: '/assets/rooms/customizable/cozy-starter/shelf.png' },
+  { id: 'tiny-wall-art', slot: 'wall', backdrop: 'sunny', name: '햇살 벽 그림', description: '왼쪽 벽에 초록잎과 해를 걸어요.', price: 55, image: '/assets/rooms/customizable/cozy-starter/wall-art.png' },
+  { id: 'window-plant', slot: 'window', backdrop: 'sunny', name: '파란 화분', description: '밝은 창가에 싱그럽게 놓여요.', price: 65, image: '/assets/rooms/customizable/cozy-starter/plant.png' },
+  { id: 'retro-sofa', slot: 'bed', backdrop: 'sunny', name: '파란 소파베드', description: '침대 자리를 가벼운 소파로 바꿔요.', price: 145, image: '/assets/rooms/customizable/retro-set/sofa-bed.png' },
+  { id: 'checker-rug', slot: 'rug', backdrop: 'sunny', name: '살구 체크 러그', description: '중앙 바닥에 산뜻한 체크를 깔아요.', price: 85, image: '/assets/rooms/customizable/retro-set/checker-rug.png' },
+  { id: 'tripod-lamp', slot: 'lighting', backdrop: 'sunny', name: '코랄 삼각 스탠드', description: '왼쪽 조명 자리에 레트로하게 놓여요.', price: 105, image: '/assets/rooms/customizable/retro-set/tripod-lamp.png' },
+  { id: 'blue-cabinet', slot: 'storage', backdrop: 'sunny', name: '파란 미닫이장', description: '오른쪽 수납 자리를 깔끔하게 채워요.', price: 130, image: '/assets/rooms/customizable/retro-set/cabinet.png' },
+  { id: 'party-wall', slot: 'wall', backdrop: 'sunny', name: '시계와 작은 가랜드', description: '왼쪽 벽에 조금 더 장난스럽게 걸어요.', price: 75, image: '/assets/rooms/customizable/retro-set/wall-clock.png' },
+  { id: 'succulent-trio', slot: 'window', backdrop: 'sunny', name: '다육이 삼총사', description: '창가에 조그만 화분 세 개를 놓아요.', price: 80, image: '/assets/rooms/customizable/retro-set/cactus.png' },
+  { id: 'lofi-sofa', slot: 'bed', backdrop: 'lofi', name: '달빛 코듀로이 소파', description: '로파이 게임룸의 중심이 되는 깊은 청록 소파예요.', price: 260, image: '/assets/rooms/customizable/lofi-game/lounge-sofa.png' },
+  { id: 'constellation-rug', slot: 'rug', backdrop: 'lofi', name: '별자리 러그', description: '발밑에 조용한 밤하늘을 깔아요.', price: 160, image: '/assets/rooms/customizable/lofi-game/constellation-rug.png' },
+  { id: 'sunset-projector', slot: 'lighting', backdrop: 'lofi', name: '노을 프로젝터', description: '왼쪽 벽에 주황빛 노을을 켜요.', price: 220, image: '/assets/rooms/customizable/lofi-game/sunset-projector.png' },
+  { id: 'gaming-console', slot: 'storage', backdrop: 'lofi', name: '로파이 게임장', description: 'TV·게임기·원목장을 한 번에 놓아요.', price: 320, image: '/assets/rooms/customizable/lofi-game/gaming-console.png' },
+  { id: 'controller-light', slot: 'wall', backdrop: 'lofi', name: '게임패드 벽등', description: '벽 한쪽을 따뜻한 게임 공간으로 바꿔요.', price: 180, image: '/assets/rooms/customizable/lofi-game/controller-light.png' },
+  { id: 'speaker-dock', slot: 'window', backdrop: 'lofi', name: '창가 로파이 오디오', description: '스피커와 버섯 조명으로 창가를 채워요.', price: 200, image: '/assets/rooms/customizable/lofi-game/speaker-dock.png' },
+]
+
+const LOFI_FURNISHING_IDS: FurnishingId[] = [
+  'lofi-sofa', 'constellation-rug', 'sunset-projector', 'gaming-console', 'controller-light', 'speaker-dock',
 ]
 
 const isFurnishingId = (value: unknown): value is FurnishingId =>
@@ -468,12 +481,35 @@ const isFurnishingId = (value: unknown): value is FurnishingId =>
 const sanitizeFurnishingInventory = (raw: unknown): FurnishingId[] =>
   Array.isArray(raw) ? [...new Set(raw.filter(isFurnishingId))] : []
 
-const sanitizeEquippedFurnishings = (raw: unknown): Partial<Record<FurnishingSlot, FurnishingId>> => {
-  if (!raw || typeof raw !== 'object') return {}
-  return Object.fromEntries(
-    Object.entries(raw).filter(([, value]) => isFurnishingId(value)),
-  ) as Partial<Record<FurnishingSlot, FurnishingId>>
+type EquippedFurnishings = Record<CustomRoomBackdrop, Partial<Record<FurnishingSlot, FurnishingId>>>
+
+const emptyEquippedFurnishings = (): EquippedFurnishings => ({ sunny: {}, lofi: {} })
+
+const sanitizeEquippedFurnishings = (raw: unknown): EquippedFurnishings => {
+  const next = emptyEquippedFurnishings()
+  if (!raw || typeof raw !== 'object') return next
+  const source = raw as Record<string, unknown>
+  if (source.sunny || source.lofi) {
+    ;(['sunny', 'lofi'] as CustomRoomBackdrop[]).forEach(backdrop => {
+      const entries = source[backdrop]
+      if (!entries || typeof entries !== 'object') return
+      Object.entries(entries).forEach(([slot, value]) => {
+        const item = roomFurnishings.find(candidate => candidate.id === value && candidate.backdrop === backdrop)
+        if (item && item.slot === slot) next[backdrop][item.slot] = item.id
+      })
+    })
+    return next
+  }
+  // 이전 버전의 단일 배치 데이터는 각 소품이 속한 방으로 자동 이전합니다.
+  Object.entries(source).forEach(([slot, value]) => {
+    const item = roomFurnishings.find(candidate => candidate.id === value)
+    if (item && item.slot === slot) next[item.backdrop][item.slot] = item.id
+  })
+  return next
 }
+
+const sanitizeCustomRoomBackdrop = (raw: unknown): CustomRoomBackdrop =>
+  raw === 'lofi' ? 'lofi' : 'sunny'
 
 /**
  * 캐릭터 코스튬 — 통짜 PNG 교체.
@@ -1094,7 +1130,8 @@ function PocketApp({ userHash }: { userHash: string }) {
   const [equippedSkin, setEquippedSkin] = useState<SkinId>(() => sanitizeEquippedSkin(loadJson(k('equipped-skin'), 'attic')))
   const [propInventory, setPropInventory] = useState<PropId[]>(() => sanitizePropList(loadJson(k('prop-inventory'), [])))
   const [furnishingInventory, setFurnishingInventory] = useState<FurnishingId[]>(() => sanitizeFurnishingInventory(loadJson(k('furnishing-inventory'), [])))
-  const [equippedFurnishings, setEquippedFurnishings] = useState<Partial<Record<FurnishingSlot, FurnishingId>>>(() => sanitizeEquippedFurnishings(loadJson(k('equipped-furnishings'), {})))
+  const [equippedFurnishings, setEquippedFurnishings] = useState<EquippedFurnishings>(() => sanitizeEquippedFurnishings(loadJson(k('equipped-furnishings'), {})))
+  const [customRoomBackdrop, setCustomRoomBackdrop] = useState<CustomRoomBackdrop>(() => sanitizeCustomRoomBackdrop(loadJson(k('custom-room-backdrop'), 'sunny')))
   const [outfitInventory, setOutfitInventory] = useState<OutfitId[]>(() => loadJson(k('outfit-inventory'), ['none']))
   const [equippedOutfit, setEquippedOutfit] = useState<OutfitId>(() => loadJson(k('equipped-outfit'), 'none'))
   const [dailyTalks, setDailyTalks] = useState(() => loadJson(k(`talks-${period.todayKey}`), 0))
@@ -1348,10 +1385,18 @@ function PocketApp({ userHash }: { userHash: string }) {
       : 'broke'
   const roomImage = equippedSkin === 'attic'
     ? roomImages[snapshot.stage]
-    : equippedRoom.stageImages?.[roomWearStage] ?? equippedRoom.image
+    : equippedSkin === 'empty-attic'
+      ? customRoomBackdrop === 'lofi'
+        ? '/assets/rooms/customizable/lofi-evening.png'
+        : '/assets/rooms/customizable/empty-attic.png'
+      : equippedRoom.stageImages?.[roomWearStage] ?? equippedRoom.image
   const visibleFurnishings = equippedSkin === 'empty-attic'
-    ? roomFurnishings.filter(item => equippedFurnishings[item.slot] === item.id)
+    ? roomFurnishings.filter(item => item.backdrop === customRoomBackdrop && equippedFurnishings[customRoomBackdrop][item.slot] === item.id)
     : []
+  const lofiFurnishings = roomFurnishings.filter(item => LOFI_FURNISHING_IDS.includes(item.id))
+  const missingLofiFurnishings = lofiFurnishings.filter(item => !furnishingInventory.includes(item.id))
+  const lofiBundlePrice = Math.ceil(missingLofiFurnishings.reduce((sum, item) => sum + item.price, 0) * 0.82 / 10) * 10
+  const ownsLofiBackdrop = lofiFurnishings.some(item => furnishingInventory.includes(item.id))
   // 식비·예산·먹기 모션에 따라 상태 키를 고르고, 착용 옷의 같은 상태 PNG를 씁니다 (guide.md).
   const dogVisualState: DogVisualState = dogMotion === 'eat'
     ? 'eating'
@@ -1422,6 +1467,7 @@ function PocketApp({ userHash }: { userHash: string }) {
   useEffect(() => saveJson(k('prop-inventory'), propInventory), [propInventory, userHash])
   useEffect(() => saveJson(k('furnishing-inventory'), furnishingInventory), [furnishingInventory, userHash])
   useEffect(() => saveJson(k('equipped-furnishings'), equippedFurnishings), [equippedFurnishings, userHash])
+  useEffect(() => saveJson(k('custom-room-backdrop'), customRoomBackdrop), [customRoomBackdrop, userHash])
   useEffect(() => saveJson(k('outfit-inventory'), outfitInventory), [outfitInventory, userHash])
   useEffect(() => saveJson(k('equipped-outfit'), equippedOutfit), [equippedOutfit, userHash])
   useEffect(() => saveJson(k('onboarding-done'), onboardingDone), [onboardingDone, userHash])
@@ -2146,12 +2192,12 @@ function PocketApp({ userHash }: { userHash: string }) {
   }
   const useFurnishing = (item: RoomFurnishing) => {
     const owned = furnishingInventory.includes(item.id)
-    const equipped = equippedFurnishings[item.slot] === item.id
+    const equipped = equippedFurnishings[item.backdrop][item.slot] === item.id
     if (equipped) {
       setEquippedFurnishings(current => {
-        const next = { ...current }
-        delete next[item.slot]
-        return next
+        const roomItems = { ...current[item.backdrop] }
+        delete roomItems[item.slot]
+        return { ...current, [item.backdrop]: roomItems }
       })
       setMessage(`${item.name}을(를) 방에서 치웠어요.`)
       return
@@ -2164,9 +2210,36 @@ function PocketApp({ userHash }: { userHash: string }) {
       setPoints(current => current - item.price)
       setFurnishingInventory(current => [...current, item.id])
     }
-    setEquippedFurnishings(current => ({ ...current, [item.slot]: item.id }))
+    setEquippedFurnishings(current => ({
+      ...current,
+      [item.backdrop]: { ...current[item.backdrop], [item.slot]: item.id },
+    }))
     setEquippedSkin('empty-attic')
-    setMessage(owned ? `${item.name}을(를) 놓았어요.` : `${item.name}을(를) 구입하고 햇살 빈방에 놓았어요.`)
+    setCustomRoomBackdrop(item.backdrop)
+    const roomName = item.backdrop === 'lofi' ? '로파이방' : '햇살방'
+    setMessage(owned ? `${item.name}을(를) ${roomName}에 놓았어요.` : `${item.name}을(를) 구입하고 ${roomName}에 놓았어요.`)
+  }
+  const useLofiFurnishingSet = () => {
+    if (missingLofiFurnishings.length > 0 && points < lofiBundlePrice) {
+      setMessage(`${lofiBundlePrice - points}냠이 부족해요.`)
+      return
+    }
+    if (missingLofiFurnishings.length > 0) {
+      setPoints(current => current - lofiBundlePrice)
+      setFurnishingInventory(current => [
+        ...new Set<FurnishingId>([...current, ...missingLofiFurnishings.map(item => item.id)]),
+      ])
+    }
+    setEquippedFurnishings(current => ({
+      ...current,
+      lofi: {
+        ...current.lofi,
+        ...Object.fromEntries(lofiFurnishings.map(item => [item.slot, item.id])),
+      },
+    }))
+    setEquippedSkin('empty-attic')
+    setCustomRoomBackdrop('lofi')
+    setMessage(missingLofiFurnishings.length > 0 ? '로파이 게임룸 세트를 구입하고 전부 배치했어요.' : '로파이 게임룸 세트를 전부 배치했어요.')
   }
   const useOutfit = (outfit: typeof characterOutfits[number]) => {
     if (outfit.companionId !== null && outfit.companionId !== companionId) {
@@ -3502,11 +3575,59 @@ function PocketApp({ userHash }: { userHash: string }) {
             </div>
           ) : shopTab === 'props' ? (
             <>
-              <p className="shop-section-title"><b>햇살 빈방 꾸미기</b><span>구매하면 지정된 자리에 놓여요.</span></p>
+              <article className="furnishing-showcase">
+                <div className="furnishing-showcase-preview" aria-hidden="true">
+                  <img className="showcase-room" src="/assets/rooms/customizable/lofi-evening.png" alt="" />
+                  {lofiFurnishings.map(item => (
+                    <img className={`showcase-item showcase-${item.slot}`} src={item.image} alt="" key={`showcase-${item.id}`} />
+                  ))}
+                </div>
+                <div className="furnishing-showcase-copy">
+                  <div>
+                    <small>PREMIUM COLLECTION</small>
+                    <h3>로파이 게임룸</h3>
+                    <p>소파부터 게임기까지, 저녁빛 빈방의 분위기를 한 번에 바꾸는 6종 세트</p>
+                    <div className="backdrop-switch" aria-label="빈방 분위기 선택">
+                      <button className={customRoomBackdrop === 'sunny' ? 'active' : ''} onClick={() => setCustomRoomBackdrop('sunny')}>햇살</button>
+                      <button className={customRoomBackdrop === 'lofi' ? 'active' : ''} disabled={!ownsLofiBackdrop} onClick={() => setCustomRoomBackdrop('lofi')}>로파이 저녁</button>
+                    </div>
+                  </div>
+                  <Button display="block" size="small" color="primary" onClick={useLofiFurnishingSet}>
+                    {missingLofiFurnishings.length === 0 ? '세트 전부 배치' : <>세트로 <NyamAmount amount={lofiBundlePrice} /></>}
+                  </Button>
+                </div>
+              </article>
+              <p className="shop-section-title"><b>햇살방 전용 소품</b><span>다른 방에서는 자동으로 숨겨져요.</span></p>
               <div className="skin-grid outfit-grid prop-grid furnishing-grid">
-                {roomFurnishings.map(item => {
+                {roomFurnishings.filter(item => item.backdrop === 'sunny').map(item => {
                   const owned = furnishingInventory.includes(item.id)
-                  const equipped = equippedFurnishings[item.slot] === item.id
+                  const equipped = equippedFurnishings.sunny[item.slot] === item.id
+                  return (
+                    <article key={item.id} className={equipped ? 'equipped' : ''}>
+                      <img src={item.image} alt={item.name} />
+                      <div>
+                        <h3>{item.name}</h3>
+                        <p>{item.description}</p>
+                      </div>
+                      <Button
+                        className="skin-cta"
+                        display="block"
+                        size="small"
+                        color={equipped ? 'dark' : 'primary'}
+                        variant={equipped ? 'weak' : 'fill'}
+                        onClick={() => useFurnishing(item)}
+                      >
+                        {equipped ? '치우기' : owned ? '놓기' : <NyamAmount amount={item.price} />}
+                      </Button>
+                    </article>
+                  )
+                })}
+              </div>
+              <p className="shop-section-title"><b>로파이방 전용 소품</b><span>놓으면 로파이 저녁으로 바뀌어요.</span></p>
+              <div className="skin-grid outfit-grid prop-grid furnishing-grid">
+                {roomFurnishings.filter(item => item.backdrop === 'lofi').map(item => {
+                  const owned = furnishingInventory.includes(item.id)
+                  const equipped = equippedFurnishings.lofi[item.slot] === item.id
                   return (
                     <article key={item.id} className={equipped ? 'equipped' : ''}>
                       <img src={item.image} alt={item.name} />
